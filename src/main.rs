@@ -4,9 +4,10 @@ use std::string::String;
 
 use nom::branch::alt;
 use nom::bytes::complete::{is_not, tag, take_while, take_while1};
-use nom::character::{is_alphanumeric, is_space};
 use nom::character::complete::alpha1;
+use nom::character::{is_alphanumeric, is_space};
 use nom::error::{Error, ErrorKind};
+use nom::multi::many1;
 use nom::Err;
 use nom::IResult;
 
@@ -40,52 +41,28 @@ fn bracket_right(input: &[u8]) -> IResult<&[u8], &[u8]> {
 fn symbol(input: &[u8]) -> IResult<&[u8], Elem> {
     let (input, elem) = alpha1(input)?;
 
+    // get a String from the &[u8] we get from alpha1
     let result = String::from_utf8(elem.to_vec()).map_err(|_| {
         nom::Err::Error(Error {
             input,
             code: ErrorKind::TakeWhile1,
         })
     })?;
-    
+
     let (input, _) = take_while(is_space)(input)?;
 
     Ok((input, Elem::Symbol(result)))
 }
 
 fn list(input: &[u8]) -> IResult<&[u8], Elem> {
-
+    let (input, _) = take_while(is_space)(input)?;
+    let (input, _) = paren_left(input)?;
+    let (input, _) = take_while(is_space)(input)?;
+    let (input, symbols) = many1(alt((symbol, list)))(input)?;
+    let (input, _) = paren_right(input)?;
     let (input, _) = take_while(is_space)(input)?;
 
-    let (mut out_input, _) = paren_left(input)?;
-
-    let mut elems: Vec<Elem> = Vec::new();
-
-    loop {
-        match symbol(out_input) {
-            Ok((input, result)) if input.len() == 0 || input[0] as char == ')' => {
-                elems.push(result);
-                out_input = input;
-                break;
-            }
-            Ok((input, result)) if input[0] as char == '(' => {
-                elems.push(result);
-                let (input, result) = list(input)?;
-                elems.push(result);
-                out_input = input
-            }
-            Ok((input, result)) => {
-                elems.push(result);
-                out_input = input
-            }
-            err => break,
-        }
-    }
-
-    let (input, _) = paren_right(out_input)?;
-
-    let (input, _) = take_while(is_space)(input)?;
-
-    Ok((input, Elem::List(elems)))
+    Ok((input, Elem::List(symbols)))
 }
 
 #[cfg(test)]
