@@ -1,24 +1,18 @@
-#![allow(warnings, unused)]
-
+use std::io;
 use std::str::from_utf8;
 
 use nom::branch::alt;
-use nom::bytes::complete::{is_not, tag, take_while, take_while1};
+use nom::bytes::complete::{tag, take_while};
 use nom::character::complete::alpha1;
-use nom::character::{is_alphanumeric, is_space};
+use nom::character::is_space;
 use nom::error::{Error, ErrorKind};
 use nom::multi::many1;
-use nom::Err;
 use nom::IResult;
 
 #[derive(Debug, Eq, PartialEq)]
 enum Elem<'a> {
     Symbol(&'a str),
     List(Vec<Elem<'a>>),
-}
-
-fn tokenize(prog: String) -> Vec<String> {
-    panic!();
 }
 
 fn paren_left(input: &[u8]) -> IResult<&[u8], &[u8]> {
@@ -29,16 +23,8 @@ fn paren_right(input: &[u8]) -> IResult<&[u8], &[u8]> {
     tag(")")(input)
 }
 
-fn bracket_left(input: &[u8]) -> IResult<&[u8], &[u8]> {
-    tag("[")(input)
-}
-
-fn bracket_right(input: &[u8]) -> IResult<&[u8], &[u8]> {
-    tag("]")(input)
-}
-
 // result error type holds &[u8]s because that's what the input in the result holds
-fn symbol<'a>(input: &'a [u8]) -> IResult<&[u8], Elem<'a>> {
+fn symbol<'a>(input: &'a [u8]) -> IResult<&'a [u8], Elem<'a>> {
     let (input, elem) = alpha1(input)?;
 
     // get an &str from the &[u8] we get from alpha1
@@ -62,6 +48,15 @@ fn list(input: &[u8]) -> IResult<&[u8], Elem> {
     let (input, _) = paren_right(input)?;
     let (input, _) = take_while(is_space)(input)?;
     Ok((input, Elem::List(symbols)))
+}
+
+fn main() -> io::Result<()> {
+    let mut buffer = String::new();
+    // use ? here to get rid of the unused Result warning
+    io::stdin().read_line(&mut buffer)?;
+    println!("AST: {:?}\n", list(buffer.as_bytes()));
+
+    Ok(())
 }
 
 #[cfg(test)]
@@ -99,7 +94,7 @@ mod test {
     fn test_list_3() {
         let res = list(b"(a b (a b c d e))");
         let mut vec1: Vec<Elem> = vec!["a", "b"].iter().map(|str| Elem::Symbol(str)).collect();
-        let mut vec2: Vec<Elem> = vec!["a", "b", "c", "d", "e"]
+        let vec2: Vec<Elem> = vec!["a", "b", "c", "d", "e"]
             .iter()
             .map(|str| Elem::Symbol(str))
             .collect();
@@ -111,7 +106,7 @@ mod test {
     fn test_list_4() {
         let res = list(b" (a b (a b c d e))");
         let mut vec1: Vec<Elem> = vec!["a", "b"].iter().map(|str| Elem::Symbol(str)).collect();
-        let mut vec2: Vec<Elem> = vec!["a", "b", "c", "d", "e"]
+        let vec2: Vec<Elem> = vec!["a", "b", "c", "d", "e"]
             .iter()
             .map(|str| Elem::Symbol(str))
             .collect();
@@ -123,7 +118,7 @@ mod test {
     fn test_list_5() {
         let res = list(b"(a b (a b c d e)) ");
         let mut vec1: Vec<Elem> = vec!["a", "b"].iter().map(|str| Elem::Symbol(str)).collect();
-        let mut vec2: Vec<Elem> = vec!["a", "b", "c", "d", "e"]
+        let vec2: Vec<Elem> = vec!["a", "b", "c", "d", "e"]
             .iter()
             .map(|str| Elem::Symbol(str))
             .collect();
@@ -135,7 +130,7 @@ mod test {
     fn test_list_7() {
         let res = list(b"                                   (   a   b     (    a b c d e) ) ");
         let mut vec1: Vec<Elem> = vec!["a", "b"].iter().map(|str| Elem::Symbol(str)).collect();
-        let mut vec2: Vec<Elem> = vec!["a", "b", "c", "d", "e"]
+        let vec2: Vec<Elem> = vec!["a", "b", "c", "d", "e"]
             .iter()
             .map(|str| Elem::Symbol(str))
             .collect();
@@ -143,5 +138,3 @@ mod test {
         assert_eq!(res, Ok(("".as_bytes(), Elem::List(vec1))))
     }
 }
-
-fn main() {}

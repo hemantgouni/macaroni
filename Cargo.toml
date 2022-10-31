@@ -1,14 +1,9 @@
 [package]
-name = "parev"
+name = "macaroni"
 version = "0.1.0"
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-syn = { version = "1.0", features = [ "full", "extra-traits", "parsing", "visit" ] }
-quote = "1.0"
 nom = { version = "7", features = [ "alloc" ] }
-
-[lib]
-proc-macro = true
