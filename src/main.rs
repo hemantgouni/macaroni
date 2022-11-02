@@ -15,6 +15,7 @@ struct Attrs {
 
 #[derive(Debug, Eq, PartialEq)]
 enum Elem<'a> {
+    String(&'a str),
     Symbol(&'a str),
     List(Vec<Elem<'a>>),
 }
@@ -35,6 +36,10 @@ fn symbol_char(char: u8) -> bool {
     !is_space(char) && char != ')' as u8 && char != '(' as u8 && !is_newline(char)
 }
 
+fn string_char(char: u8) -> bool {
+    char != '"' as u8
+}
+
 // result error type holds &[u8]s because that's what the input in the result holds
 fn symbol<'a>(input: &'a [u8]) -> IResult<&'a [u8], Elem<'a>> {
     let (input, elem) = take_while1(symbol_char)(input)?;
@@ -47,18 +52,31 @@ fn symbol<'a>(input: &'a [u8]) -> IResult<&'a [u8], Elem<'a>> {
         })
     })?;
 
-    println!("Recognized symbol: {:?}", result);
-
     let (input, _) = take_while(skip_char)(input)?;
 
     Ok((input, Elem::Symbol(&result)))
+}
+
+fn string<'a>(input: &'a [u8]) -> IResult<&'a [u8], Elem<'a>> {
+    let (input, _) = tag("\"")(input)?;
+    let (input, elem) = take_while(string_char)(input)?;
+    let (input, _) = tag("\"")(input)?;
+
+    let result = from_utf8(elem).map_err(|_| {
+        nom::Err::Error(Error {
+            input,
+            code: ErrorKind::TakeWhile1,
+        })
+    })?;
+
+    Ok((input, Elem::String(&result)))
 }
 
 fn list(input: &[u8]) -> IResult<&[u8], Elem> {
     let (input, _) = take_while(skip_char)(input)?;
     let (input, _) = paren_left(input)?;
     let (input, _) = take_while(skip_char)(input)?;
-    let (input, symbols) = many0(alt((symbol, list)))(input)?;
+    let (input, symbols) = many0(alt((string, symbol, list)))(input)?;
     let (input, _) = paren_right(input)?;
     let (input, _) = take_while(skip_char)(input)?;
     Ok((input, Elem::List(symbols)))
@@ -167,6 +185,27 @@ mod test {
                     Elem::Symbol("println"),
                     Elem::Symbol("Hello"),
                     Elem::Symbol("world"),
+                ]),
+            ]),
+        ));
+        assert_eq!(res, target)
+    }
+
+    #[test]
+    fn test_list_10() {
+        let res = list(
+            b"
+            (fn hello-world
+             (println \"hey, world!\"))",
+        );
+        let target: Result<(&[u8], Elem), nom::Err<Error<&[u8]>>> = Ok((
+            &[],
+            Elem::List(vec![
+                Elem::Symbol("fn"),
+                Elem::Symbol("hello-world"),
+                Elem::List(vec![
+                    Elem::Symbol("println"),
+                    Elem::String("hey, world!")
                 ]),
             ]),
         ));
