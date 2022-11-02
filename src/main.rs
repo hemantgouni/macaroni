@@ -1,13 +1,17 @@
+use std::fs;
 use std::io;
 use std::str::from_utf8;
 
 use nom::branch::alt;
-use nom::bytes::complete::{tag, take_while};
-use nom::character::complete::alpha1;
-use nom::character::is_space;
+use nom::bytes::complete::{tag, take_while, take_while1};
+use nom::character::{is_newline, is_space};
 use nom::error::{Error, ErrorKind};
-use nom::multi::many1;
+use nom::multi::many0;
 use nom::IResult;
+
+struct Attrs {
+    bindings: Vec<(String,)>,
+}
 
 #[derive(Debug, Eq, PartialEq)]
 enum Elem<'a> {
@@ -23,9 +27,17 @@ fn paren_right(input: &[u8]) -> IResult<&[u8], &[u8]> {
     tag(")")(input)
 }
 
+fn skip_char(char: u8) -> bool {
+    is_space(char) || is_newline(char)
+}
+
+fn symbol_char(char: u8) -> bool {
+    !is_space(char) && char != ')' as u8 && char != '(' as u8 && !is_newline(char)
+}
+
 // result error type holds &[u8]s because that's what the input in the result holds
 fn symbol<'a>(input: &'a [u8]) -> IResult<&'a [u8], Elem<'a>> {
-    let (input, elem) = alpha1(input)?;
+    let (input, elem) = take_while1(symbol_char)(input)?;
 
     // get an &str from the &[u8] we get from alpha1
     let result = from_utf8(elem).map_err(|_| {
@@ -35,26 +47,27 @@ fn symbol<'a>(input: &'a [u8]) -> IResult<&'a [u8], Elem<'a>> {
         })
     })?;
 
-    let (input, _) = take_while(is_space)(input)?;
+    println!("Recognized symbol: {:?}", result);
+
+    let (input, _) = take_while(skip_char)(input)?;
 
     Ok((input, Elem::Symbol(&result)))
 }
 
 fn list(input: &[u8]) -> IResult<&[u8], Elem> {
-    let (input, _) = take_while(is_space)(input)?;
+    let (input, _) = take_while(skip_char)(input)?;
     let (input, _) = paren_left(input)?;
-    let (input, _) = take_while(is_space)(input)?;
-    let (input, symbols) = many1(alt((symbol, list)))(input)?;
+    let (input, _) = take_while(skip_char)(input)?;
+    let (input, symbols) = many0(alt((symbol, list)))(input)?;
     let (input, _) = paren_right(input)?;
-    let (input, _) = take_while(is_space)(input)?;
+    let (input, _) = take_while(skip_char)(input)?;
     Ok((input, Elem::List(symbols)))
 }
 
 fn main() -> io::Result<()> {
-    let mut buffer = String::new();
     // use ? here to get rid of the unused Result warning
-    io::stdin().read_line(&mut buffer)?;
-    println!("AST: {:?}\n", list(buffer.as_bytes()));
+    let contents = fs::read_to_string("input.txt").expect("No such file or directory!");
+    println!("AST: {:?}\n", list(contents.as_bytes()));
 
     Ok(())
 }
@@ -136,5 +149,27 @@ mod test {
             .collect();
         vec1.push(Elem::List(vec2));
         assert_eq!(res, Ok(("".as_bytes(), Elem::List(vec1))))
+    }
+
+    #[test]
+    fn test_list_8() {
+        let res = list(
+            b"
+            (fn hello-world
+             (println Hello world))",
+        );
+        let target: Result<(&[u8], Elem), nom::Err<Error<&[u8]>>> = Ok((
+            &[],
+            Elem::List(vec![
+                Elem::Symbol("fn"),
+                Elem::Symbol("hello-world"),
+                Elem::List(vec![
+                    Elem::Symbol("println"),
+                    Elem::Symbol("Hello"),
+                    Elem::Symbol("world"),
+                ]),
+            ]),
+        ));
+        assert_eq!(res, target)
     }
 }

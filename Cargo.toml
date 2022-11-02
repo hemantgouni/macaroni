@@ -7,3 +7,5 @@ edition = "2021"
 
 [dependencies]
 nom = { version = "7", features = [ "alloc" ] }
+syn = "1"
+quote = "1"
