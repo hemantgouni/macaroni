@@ -211,4 +211,46 @@ mod test {
         ));
         assert_eq!(res, target)
     }
+
+    #[test]
+    fn test_list_11() {
+        let res = list(
+            b"
+            (fn hello-world
+             (println! \"hey, world!\"))",
+        );
+        let target: Result<(&[u8], Elem), nom::Err<Error<&[u8]>>> = Ok((
+            &[],
+            Elem::List(vec![
+                Elem::Symbol("fn"),
+                Elem::Symbol("hello-world"),
+                Elem::List(vec![
+                    Elem::Symbol("println!"),
+                    Elem::String("hey, world!")
+                ]),
+            ]),
+        ));
+        assert_eq!(res, target)
+    }
+
+    #[test]
+    fn test_list_12() {
+        let res = list(
+            b"
+            (fn hello-world
+             (println! \"hey,\" world!\"))",
+        );
+        let target: Result<(&[u8], Elem), nom::Err<Error<&[u8]>>> = Ok((
+            &[],
+            Elem::List(vec![
+                Elem::Symbol("fn"),
+                Elem::Symbol("hello-world"),
+                Elem::List(vec![
+                    Elem::Symbol("println!"),
+                    Elem::String("hey,\" world!")
+                ]),
+            ]),
+        ));
+        assert_eq!(res, target)
+    }
 }
