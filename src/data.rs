@@ -23,6 +23,7 @@ pub enum Value {
 #[derive(Debug, Eq, PartialEq, Clone)]
 pub enum AST {
     Value(Value),
+    Quote(Vec<AST>),
     Let(Ident, Box<AST>, Box<AST>),
     Concat(Box<AST>, Box<AST>),
     Add(Box<AST>, Box<AST>),

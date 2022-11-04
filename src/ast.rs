@@ -10,6 +10,11 @@ impl From<Elem<'_>> for AST {
                 .and_then(|int| Ok(AST::Value(Value::I64(int))))
                 .unwrap_or(AST::Value(Value::Symbol(str.to_string()))),
             Elem::List(elems) => match &elems[..] {
+                [Elem::Symbol("quote"), rest @ ..] => AST::Quote(Vec::from(
+                    rest.iter()
+                        .map(|elem| elem.to_owned().into())
+                        .collect::<Vec<AST>>(),
+                )),
                 [Elem::Symbol("let"), Elem::Symbol(var), expr1, expr2] => AST::Let(
                     Ident(var.to_string()),
                     Box::new(expr1.clone().into()),
@@ -68,6 +73,42 @@ mod test {
                 Box::new(AST::Add(
                     Box::new(AST::Value(Value::I64(1))),
                     Box::new(AST::Add(
+                        Box::new(AST::Value(Value::I64(1))),
+                        Box::new(AST::Value(Value::I64(1))),
+                    )),
+                )),
+            )),
+        );
+        assert_eq!(res, target)
+    }
+
+    #[test]
+    fn test_from_4() {
+        let res: AST = parse("(quote a b c d e (+ 1 1))").unwrap().into();
+        let target: AST = AST::Quote(vec![
+            AST::Value(Value::Symbol("a".into())),
+            AST::Value(Value::Symbol("b".into())),
+            AST::Value(Value::Symbol("c".into())),
+            AST::Value(Value::Symbol("d".into())),
+            AST::Value(Value::Symbol("e".into())),
+            AST::Add(
+                Box::new(AST::Value(Value::I64(1))),
+                Box::new(AST::Value(Value::I64(1))),
+            ),
+        ]);
+        assert_eq!(res, target)
+    }
+
+    #[test]
+    fn test_from_5() {
+        let res: AST = parse("(/ 1 (- 1 (+ 1 (* 1 1))))").unwrap().into();
+        let target: AST = AST::Div(
+            Box::new(AST::Value(Value::I64(1))),
+            Box::new(AST::Sub(
+                Box::new(AST::Value(Value::I64(1))),
+                Box::new(AST::Add(
+                    Box::new(AST::Value(Value::I64(1))),
+                    Box::new(AST::Mult(
                         Box::new(AST::Value(Value::I64(1))),
                         Box::new(AST::Value(Value::I64(1))),
                     )),
