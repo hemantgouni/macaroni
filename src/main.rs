@@ -19,7 +19,7 @@ fn main() -> io::Result<()> {
         .expect("No such file or directory!");
     let ast: AST = parse::parse(&contents).unwrap().into();
 
-    println!("{:?}", ast);
+    println!("{:#?}", ast);
 
     Ok(())
 }
