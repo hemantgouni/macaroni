@@ -1,11 +1,14 @@
 mod parse;
+mod ast;
+mod data;
 
-use std::{io, fs};
+use std::{fs, io};
+
+use crate::data::AST;
 
 fn main() -> io::Result<()> {
-    // use ? here to get rid of the unused Result warning
     let contents = fs::read_to_string("input.txt").expect("No such file or directory!");
-    println!("AST: {:?}\n", parse::list(contents.as_bytes()));
-
+    let ast: AST = parse::parse(&contents).unwrap().into();
+    println!("AST: {:?}\n", ast);
     Ok(())
 }

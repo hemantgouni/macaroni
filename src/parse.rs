@@ -2,22 +2,13 @@ use std::str::from_utf8;
 
 use nom::branch::alt;
 use nom::bytes::complete::{tag, take_while, take_while1};
-use nom::character::{is_newline, is_space};
+use nom::character::is_newline;
+use nom::character::is_space;
 use nom::multi::many0;
 use nom::IResult;
-
 use nom::error::{Error, ErrorKind};
 
-pub struct Attrs<A> {
-    bindings: Vec<(String, A)>,
-}
-
-#[derive(Debug, Eq, PartialEq)]
-pub enum Elem<'a> {
-    String(&'a str),
-    Symbol(&'a str),
-    List(Vec<Elem<'a>>),
-}
+use crate::data::Elem;
 
 fn paren_left(input: &[u8]) -> IResult<&[u8], &[u8]> {
     tag("(")(input)
@@ -70,7 +61,7 @@ fn symbol<'a>(input: &'a [u8]) -> IResult<&'a [u8], Elem<'a>> {
     Ok((input, Elem::Symbol(&result)))
 }
 
-pub fn list(input: &[u8]) -> IResult<&[u8], Elem> {
+fn list(input: &[u8]) -> IResult<&[u8], Elem> {
     let (input, _) = take_while(skip_char)(input)?;
     let (input, _) = paren_left(input)?;
     let (input, _) = take_while(skip_char)(input)?;
@@ -78,6 +69,12 @@ pub fn list(input: &[u8]) -> IResult<&[u8], Elem> {
     let (input, _) = paren_right(input)?;
     let (input, _) = take_while(skip_char)(input)?;
     Ok((input, Elem::List(symbols)))
+}
+
+pub fn parse(input: &str) -> Result<Elem, String> {
+    list(input.as_bytes())
+        .map(|(_, elem)| elem)
+        .map_err(|err| format!("Parse error: {:?}", err))
 }
 
 #[cfg(test)]
