@@ -17,6 +17,13 @@ impl From<Elem<'_>> for AST {
                         .collect::<Vec<AST>>(),
                     Box::new(body.to_owned().into()),
                 ),
+                [Elem::Symbol("macro"), Elem::Symbol(ident), Elem::List(args), body] => AST::Macro(
+                    Ident(ident.to_string()),
+                    args.iter()
+                        .map(|elem| elem.to_owned().into())
+                        .collect::<Vec<AST>>(),
+                    Box::new(body.to_owned().into()),
+                ),
                 [Elem::Symbol("quote"), rest @ ..] => AST::Quote(
                     rest.iter()
                         .map(|elem| elem.to_owned().into())
@@ -178,6 +185,37 @@ mod test {
         .into();
         let target: AST = AST::Toplevel(vec![
             AST::Func(
+                Ident("add1".into()),
+                vec![AST::Value(Value::Symbol("num".into()))],
+                Box::new(AST::Add(
+                    Box::new(AST::Value(Value::Symbol("num".into()))),
+                    Box::new(AST::Value(Value::I64(1))),
+                )),
+            ),
+            AST::Let(
+                Ident("a".into()),
+                Box::new(AST::Value(Value::I64(4))),
+                Box::new(AST::Add(
+                    Box::new(AST::Value(Value::I64(1))),
+                    Box::new(AST::Value(Value::I64(1))),
+                )),
+            ),
+        ]);
+        assert_eq!(res, target);
+    }
+
+    #[test]
+    fn test_from_11() {
+        let res: AST = parse(
+            "((macro add1 (num)
+               (+ num 1))
+              (let a 4
+               (+ 1 1)))",
+        )
+        .unwrap()
+        .into();
+        let target: AST = AST::Toplevel(vec![
+            AST::Macro(
                 Ident("add1".into()),
                 vec![AST::Value(Value::Symbol("num".into()))],
                 Box::new(AST::Add(
