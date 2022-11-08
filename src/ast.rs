@@ -4,12 +4,12 @@ use crate::data::{Elem, Toplevel, Value, AST};
 impl From<Elem<'_>> for AST {
     fn from(elem: Elem) -> AST {
         match elem {
-            Elem::String(str) => AST::Value(Value::String(str.to_string())),
+            Elem::String(str) => AST::Value(Value::String(str.into())),
             Elem::Symbol(str) => str
                 .to_string()
                 .parse::<i64>()
                 .map(|int| AST::Value(Value::I64(int)))
-                .unwrap_or_else(|_| AST::Value(Value::Symbol(str.into()))),
+                .unwrap_or_else(|_| AST::Symbol(str.into())),
             Elem::List(elems) => match elems.as_slice() {
                 [Elem::Symbol("quote"), rest @ ..] => AST::Quote(
                     rest.iter()
@@ -97,7 +97,7 @@ mod test {
             "a".into(),
             Box::new(AST::Value(Value::I64(4))),
             Box::new(AST::Add(
-                Box::new(AST::Value(Value::Symbol("a".into()))),
+                Box::new(AST::Symbol("a".into())),
                 Box::new(AST::Value(Value::I64(4))),
             )),
         );
@@ -130,11 +130,11 @@ mod test {
     fn test_from_4() {
         let res: AST = parse("(quote a b c d e (+ 1 1))").unwrap().into();
         let target: AST = AST::Quote(vec![
-            AST::Value(Value::Symbol("a".into())),
-            AST::Value(Value::Symbol("b".into())),
-            AST::Value(Value::Symbol("c".into())),
-            AST::Value(Value::Symbol("d".into())),
-            AST::Value(Value::Symbol("e".into())),
+            AST::Symbol("a".into()),
+            AST::Symbol("b".into()),
+            AST::Symbol("c".into()),
+            AST::Symbol("d".into()),
+            AST::Symbol("e".into()),
             AST::Add(
                 Box::new(AST::Value(Value::I64(1))),
                 Box::new(AST::Value(Value::I64(1))),
@@ -147,11 +147,11 @@ mod test {
     fn test_from_5() {
         let res: AST = parse("(unquote a b c d e (+ 1 1))").unwrap().into();
         let target: AST = AST::Unquote(vec![
-            AST::Value(Value::Symbol("a".into())),
-            AST::Value(Value::Symbol("b".into())),
-            AST::Value(Value::Symbol("c".into())),
-            AST::Value(Value::Symbol("d".into())),
-            AST::Value(Value::Symbol("e".into())),
+            AST::Symbol("a".into()),
+            AST::Symbol("b".into()),
+            AST::Symbol("c".into()),
+            AST::Symbol("d".into()),
+            AST::Symbol("e".into()),
             AST::Add(
                 Box::new(AST::Value(Value::I64(1))),
                 Box::new(AST::Value(Value::I64(1))),
@@ -184,10 +184,10 @@ mod test {
         let res: Toplevel = parse("((fn add1 (num) (+ 1 num)))").unwrap().into();
         let target: Toplevel = Toplevel(vec![AST::Func(
             "add1".into(),
-            vec![AST::Value(Value::Symbol("num".into()))],
+            vec![AST::Symbol("num".into())],
             Box::new(AST::Add(
                 Box::new(AST::Value(Value::I64(1))),
-                Box::new(AST::Value(Value::Symbol("num".into()))),
+                Box::new(AST::Symbol("num".into())),
             )),
         )]);
         assert_eq!(res, target)
@@ -206,9 +206,9 @@ mod test {
         let target: Toplevel = Toplevel(vec![
             AST::Func(
                 "add1".into(),
-                vec![AST::Value(Value::Symbol("num".into()))],
+                vec![AST::Symbol("num".into())],
                 Box::new(AST::Add(
-                    Box::new(AST::Value(Value::Symbol("num".into()))),
+                    Box::new(AST::Symbol("num".into())),
                     Box::new(AST::Value(Value::I64(1))),
                 )),
             ),
@@ -237,9 +237,9 @@ mod test {
         let target: Toplevel = Toplevel(vec![
             AST::Macro(
                 "add1".into(),
-                vec![AST::Value(Value::Symbol("num".into()))],
+                vec![AST::Symbol("num".into())],
                 Box::new(AST::Add(
-                    Box::new(AST::Value(Value::Symbol("num".into()))),
+                    Box::new(AST::Symbol("num".into())),
                     Box::new(AST::Value(Value::I64(1))),
                 )),
             ),
@@ -284,9 +284,9 @@ mod test {
         let target: Toplevel = Toplevel(vec![
             AST::Func(
                 "add1".into(),
-                vec![AST::Value(Value::Symbol("num".into()))],
+                vec![AST::Symbol("num".into())],
                 Box::new(AST::Add(
-                    Box::new(AST::Value(Value::Symbol("num".into()))),
+                    Box::new(AST::Symbol("num".into())),
                     Box::new(AST::Value(Value::I64(1))),
                 )),
             ),

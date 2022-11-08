@@ -21,7 +21,6 @@ impl From<&str> for Ident {
 pub enum Value {
     I64(i64),
     String(String),
-    Symbol(Ident),
 }
 
 #[derive(Debug, Eq, PartialEq, Clone)]
@@ -30,6 +29,7 @@ pub enum AST {
     Call(Ident, Vec<AST>),
     Macro(Ident, Vec<AST>, Box<AST>),
     Value(Value),
+    Symbol(Ident),
     Quote(Vec<AST>),
     Unquote(Vec<AST>),
     Let(Ident, Box<AST>, Box<AST>),
