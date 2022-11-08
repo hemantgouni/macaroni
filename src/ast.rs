@@ -43,7 +43,7 @@ impl From<Elem<'_>> for AST {
                 }
                 [Elem::Symbol(ident), rest @ ..] => AST::Call(
                     (*ident).into(),
-                    rest.iter().map(|elem| elem.to_owned().into()).collect(),
+                    rest.iter().map(|elem| dbg!(elem).to_owned().into()).collect(),
                 ),
                 other => panic!("Unable to abstractify: {:#?}", other),
             },

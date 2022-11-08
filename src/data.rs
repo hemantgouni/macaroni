@@ -13,7 +13,13 @@ pub struct Ident(String);
 
 impl From<&str> for Ident {
     fn from(str: &str) -> Ident {
-        Ident(str.to_string())
+        match str {
+            "fn" | "macro" => panic!(
+                "Special form encountered where an identifier was expected: {}",
+                str
+            ),
+            _ => Ident(str.into()),
+        }
     }
 }
 
