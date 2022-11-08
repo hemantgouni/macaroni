@@ -1,4 +1,4 @@
-use crate::data::{Elem, Ident, Toplevel, Value, AST};
+use crate::data::{Elem, Toplevel, Value, AST};
 
 // parses all non-toplevel expressions
 impl From<Elem<'_>> for AST {
@@ -8,21 +8,21 @@ impl From<Elem<'_>> for AST {
             Elem::Symbol(str) => str
                 .to_string()
                 .parse::<i64>()
-                .and_then(|int| Ok(AST::Value(Value::I64(int))))
-                .unwrap_or(AST::Value(Value::Symbol(str.to_string()))),
+                .map(|int| AST::Value(Value::I64(int)))
+                .unwrap_or_else(|_| AST::Value(Value::Symbol(str.into()))),
             Elem::List(elems) => match elems.as_slice() {
                 [Elem::Symbol("quote"), rest @ ..] => AST::Quote(
                     rest.iter()
                         .map(|elem| elem.to_owned().into())
                         .collect::<Vec<AST>>(),
                 ),
-                [Elem::Symbol("unquote"), rest @ ..] => AST::Unquote(Vec::from(
+                [Elem::Symbol("unquote"), rest @ ..] => AST::Unquote(
                     rest.iter()
                         .map(|elem| elem.to_owned().into())
                         .collect::<Vec<AST>>(),
-                )),
+                ),
                 [Elem::Symbol("let"), Elem::Symbol(ident), expr1, expr2] => AST::Let(
-                    Ident(ident.to_string()),
+                    (*ident).into(),
                     Box::new(expr1.clone().into()),
                     Box::new(expr2.clone().into()),
                 ),
@@ -41,6 +41,10 @@ impl From<Elem<'_>> for AST {
                 [Elem::Symbol("*"), num1, num2] => {
                     AST::Mult(Box::new(num1.clone().into()), Box::new(num2.clone().into()))
                 }
+                [Elem::Symbol(ident), rest @ ..] => AST::Call(
+                    (*ident).into(),
+                    rest.iter().map(|elem| elem.to_owned().into()).collect(),
+                ),
                 other => panic!("Unable to abstractify: {:#?}", other),
             },
         }
@@ -52,10 +56,10 @@ impl From<Elem<'_>> for Toplevel {
     fn from(elem: Elem) -> Toplevel {
         match elem {
             Elem::List(elems) => Toplevel(elems.iter().map(|elem| match elem {
-                Elem::List(top_form) => match top_form.as_slice() {
+                Elem::List(toplevel_form) => match toplevel_form.as_slice() {
                     [Elem::Symbol("fn"), Elem::Symbol(ident), Elem::List(args), body] =>
                         AST::Func(
-                            Ident(ident.to_string()),
+                            (*ident).into(),
                             args.iter()
                                 .map(|elem| elem.to_owned().into())
                                 .collect::<Vec<AST>>(),
@@ -63,7 +67,7 @@ impl From<Elem<'_>> for Toplevel {
                         ),
                     [Elem::Symbol("macro"), Elem::Symbol(ident), Elem::List(args), body] =>
                         AST::Macro(
-                            Ident(ident.to_string()),
+                            (*ident).into(),
                             args.iter()
                                 .map(|elem| elem.to_owned().into())
                                 .collect::<Vec<AST>>(),
@@ -73,8 +77,7 @@ impl From<Elem<'_>> for Toplevel {
                     // could appear at the top level
                     _ => elem.to_owned().into(),
                 },
-                // defer to the other AST impl to translate strings or symbols
-                _ => elem.to_owned().into(),
+                _ => panic!("Error: no list of top-level forms provided!"),
             }).collect::<Vec<AST>>()),
             // The top level wasn't passed a list of top-level forms, error!
             _ => panic!("Parsing into toplevel form failed: {:#?}", elem),
@@ -91,10 +94,10 @@ mod test {
     fn test_from_1() {
         let res: AST = parse("(let a 4 (+ a 4))").unwrap().into();
         let target: AST = AST::Let(
-            Ident("a".to_string()),
+            "a".into(),
             Box::new(AST::Value(Value::I64(4))),
             Box::new(AST::Add(
-                Box::new(AST::Value(Value::Symbol("a".to_string()))),
+                Box::new(AST::Value(Value::Symbol("a".into()))),
                 Box::new(AST::Value(Value::I64(4))),
             )),
         );
@@ -180,7 +183,7 @@ mod test {
     fn test_from_8() {
         let res: Toplevel = parse("((fn add1 (num) (+ 1 num)))").unwrap().into();
         let target: Toplevel = Toplevel(vec![AST::Func(
-            Ident("add1".into()),
+            "add1".into(),
             vec![AST::Value(Value::Symbol("num".into()))],
             Box::new(AST::Add(
                 Box::new(AST::Value(Value::I64(1))),
@@ -202,7 +205,7 @@ mod test {
         .into();
         let target: Toplevel = Toplevel(vec![
             AST::Func(
-                Ident("add1".into()),
+                "add1".into(),
                 vec![AST::Value(Value::Symbol("num".into()))],
                 Box::new(AST::Add(
                     Box::new(AST::Value(Value::Symbol("num".into()))),
@@ -210,7 +213,7 @@ mod test {
                 )),
             ),
             AST::Let(
-                Ident("a".into()),
+                "a".into(),
                 Box::new(AST::Value(Value::I64(4))),
                 Box::new(AST::Add(
                     Box::new(AST::Value(Value::I64(1))),
@@ -233,7 +236,7 @@ mod test {
         .into();
         let target: Toplevel = Toplevel(vec![
             AST::Macro(
-                Ident("add1".into()),
+                "add1".into(),
                 vec![AST::Value(Value::Symbol("num".into()))],
                 Box::new(AST::Add(
                     Box::new(AST::Value(Value::Symbol("num".into()))),
@@ -241,13 +244,53 @@ mod test {
                 )),
             ),
             AST::Let(
-                Ident("a".into()),
+                "a".into(),
                 Box::new(AST::Value(Value::I64(4))),
                 Box::new(AST::Add(
                     Box::new(AST::Value(Value::I64(1))),
                     Box::new(AST::Value(Value::I64(1))),
                 )),
             ),
+        ]);
+        assert_eq!(res, target);
+    }
+
+    #[test]
+    #[should_panic]
+    #[allow(unused_must_use)]
+    fn test_from_12() {
+        <Elem as Into<Toplevel>>::into(parse("(())").unwrap());
+    }
+
+    #[test]
+    #[should_panic]
+    #[allow(unused_must_use)]
+    fn test_from_14() {
+        let res = <Elem as Into<Toplevel>>::into(parse("(+ 1 1)").unwrap());
+        println!("{:#?}", res);
+    }
+
+    #[test]
+    fn test_from_15() {
+        let res: Toplevel = parse(
+            "
+            ((fn add1 (num)
+              (+ num 1))
+             (add1 1))
+        ",
+        )
+        .unwrap()
+        .into();
+        let target: Toplevel = Toplevel(vec![
+            AST::Func(
+                "add1".into(),
+                vec![AST::Value(Value::Symbol("num".into()))],
+                Box::new(AST::Add(
+                    Box::new(AST::Value(Value::Symbol("num".into()))),
+                    Box::new(AST::Value(Value::I64(1))),
+                )),
+            ),
+            AST::Call("add1".into(), vec![AST::Value(Value::I64(1))]),
         ]);
         assert_eq!(res, target);
     }

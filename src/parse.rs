@@ -23,14 +23,14 @@ fn skip_char(char: u8) -> bool {
 }
 
 fn symbol_char(char: u8) -> bool {
-    !is_space(char) && char != ')' as u8 && char != '(' as u8 && !is_newline(char)
+    !is_space(char) && char != b')' && char != b'(' && !is_newline(char)
 }
 
 fn string_char(char: u8) -> bool {
-    char != '"' as u8
+    char != b'"'
 }
 
-fn string<'a>(input: &'a [u8]) -> IResult<&'a [u8], Elem<'a>> {
+fn string(input: &[u8]) -> IResult<&[u8], Elem> {
     let (input, _) = tag("\"")(input)?;
     let (input, elem) = take_while1(string_char)(input)?;
     let (input, _) = tag("\"")(input)?;
@@ -42,11 +42,11 @@ fn string<'a>(input: &'a [u8]) -> IResult<&'a [u8], Elem<'a>> {
         })
     })?;
 
-    Ok((input, Elem::String(&result)))
+    Ok((input, Elem::String(result)))
 }
 
 // result error type holds &[u8]s because that's what the input in the result holds
-fn symbol<'a>(input: &'a [u8]) -> IResult<&'a [u8], Elem<'a>> {
+fn symbol(input: &[u8]) -> IResult<&[u8], Elem> {
     let (input, elem) = take_while1(symbol_char)(input)?;
     let (input, _) = take_while(skip_char)(input)?;
 
@@ -58,7 +58,7 @@ fn symbol<'a>(input: &'a [u8]) -> IResult<&'a [u8], Elem<'a>> {
         })
     })?;
 
-    Ok((input, Elem::Symbol(&result)))
+    Ok((input, Elem::Symbol(result)))
 }
 
 fn list(input: &[u8]) -> IResult<&[u8], Elem> {

@@ -1,4 +1,3 @@
 ((fn add1 (num)
-    (+ num 1))
- (let a 4
-    (+ a (- a a))))
+    (+ 1 num))
+ (add1 1))
