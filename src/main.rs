@@ -5,7 +5,7 @@ mod parse;
 
 use std::{env, fs, io};
 
-use crate::data::AST;
+use crate::data::Toplevel;
 
 // type checker combinators??
 //
@@ -17,7 +17,7 @@ fn main() -> io::Result<()> {
 
     let contents = fs::read_to_string(args.get(1).unwrap_or(&String::from("input.txt")))
         .expect("No such file or directory!");
-    let ast: AST = parse::parse(&contents).unwrap().into();
+    let ast: Toplevel = parse::parse(&contents).unwrap().into();
 
     println!("{:#?}", ast);
 

@@ -6,6 +6,9 @@ pub enum Elem<'a> {
 }
 
 #[derive(Debug, Eq, PartialEq, Clone)]
+pub struct Toplevel(pub Vec<AST>);
+
+#[derive(Debug, Eq, PartialEq, Clone)]
 pub struct Ident(pub String);
 
 #[derive(Debug, Eq, PartialEq, Clone)]
@@ -17,7 +20,6 @@ pub enum Value {
 
 #[derive(Debug, Eq, PartialEq, Clone)]
 pub enum AST {
-    Toplevel(Vec<AST>),
     Func(Ident, Vec<AST>, Box<AST>),
     Macro(Ident, Vec<AST>, Box<AST>),
     Value(Value),

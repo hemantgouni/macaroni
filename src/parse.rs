@@ -4,9 +4,9 @@ use nom::branch::alt;
 use nom::bytes::complete::{tag, take_while, take_while1};
 use nom::character::is_newline;
 use nom::character::is_space;
+use nom::error::{Error, ErrorKind};
 use nom::multi::many0;
 use nom::IResult;
-use nom::error::{Error, ErrorKind};
 
 use crate::data::Elem;
 
