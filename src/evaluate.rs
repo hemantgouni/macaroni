@@ -46,7 +46,7 @@ fn evaluate_top(forms: Vec<AST>, mut environment: Env) -> Result<Lit, String> {
 }
 
 fn evaluate_expr(program: AST, mut environment: Env) -> Result<Lit, String> {
-    match dbg!(program.clone()) {
+    match program.clone() {
         AST::Call(ident, actual_args) => match environment.lookup(&ident) {
             Ok(AST::Func(_, formal_args, body)) => {
                 let environment: Result<Env, String> = formal_args
@@ -76,21 +76,21 @@ fn evaluate_expr(program: AST, mut environment: Env) -> Result<Lit, String> {
             evaluate_expr(*expr2, environment.to_owned())?,
         ) {
             (Lit::I64(num1), Lit::I64(num2)) => Ok(Lit::I64(num1 - num2)),
-            _ => Err("Attempted to add two non-numbers!".into()),
+            _ => Err("Attempted to subtract two non-numbers!".into()),
         },
         AST::Div(expr1, expr2) => match (
             evaluate_expr(*expr1, environment.to_owned())?,
             evaluate_expr(*expr2, environment.to_owned())?,
         ) {
             (Lit::I64(num1), Lit::I64(num2)) => Ok(Lit::I64(num1 / num2)),
-            _ => Err("Attempted to add two non-numbers!".into()),
+            _ => Err("Attempted to divide two non-numbers!".into()),
         },
         AST::Mult(expr1, expr2) => match (
             evaluate_expr(*expr1, environment.to_owned())?,
             evaluate_expr(*expr2, environment.to_owned())?,
         ) {
             (Lit::I64(num1), Lit::I64(num2)) => Ok(Lit::I64(num1 * num2)),
-            _ => Err("Attempted to add two non-numbers!".into()),
+            _ => Err("Attempted to multiply two non-numbers!".into()),
         },
         AST::Lit(lit) => Ok(lit),
         AST::Let(ident, bind_expr, body_expr) => {
@@ -119,7 +119,28 @@ fn evaluate_expr(program: AST, mut environment: Env) -> Result<Lit, String> {
             (Lit::I64(num1), Lit::I64(num2)) => Ok(Lit::Bool(num1 == num2)),
             (Lit::Bool(bool1), Lit::Bool(bool2)) => Ok(Lit::Bool(bool1 == bool2)),
             (Lit::String(str1), Lit::String(str2)) => Ok(Lit::Bool(str1 == str2)),
-            _ => panic!(),
+            other => panic!("Differing types given to ==: {:?}", other),
+        },
+        AST::And(expr1, expr2) => match (
+            evaluate_expr(*expr1, environment.to_owned())?,
+            evaluate_expr(*expr2, environment.to_owned())?,
+        ) {
+            (Lit::Bool(bool1), Lit::Bool(bool2)) => Ok(Lit::Bool(bool1 && bool2)),
+            other => panic!("Non-boolean arguments received for &&: {:?}", other),
+        },
+        AST::Or(expr1, expr2) => match (
+            evaluate_expr(*expr1, environment.to_owned())?,
+            evaluate_expr(*expr2, environment.to_owned())?,
+        ) {
+            (Lit::Bool(bool1), Lit::Bool(bool2)) => Ok(Lit::Bool(bool1 || bool2)),
+            other => panic!("Non-boolean arguments received for ||: {:?}", other),
+        },
+        AST::Concat(expr1, expr2) => match (
+            evaluate_expr(*expr1, environment.to_owned())?,
+            evaluate_expr(*expr2, environment.to_owned())?,
+        ) {
+            (Lit::String(str1), Lit::String(str2)) => Ok(Lit::String(str1 + &str2)),
+            other => panic!("Non-string arguments given to ++: {:?}", other),
         },
         AST::Symbol(ident) => environment
             .lookup(&ident)
@@ -153,5 +174,72 @@ mod test {
     #[should_panic]
     fn test_evaluate_4() {
         evaluate(parse("((+ a 1))").unwrap().into()).unwrap();
+    }
+
+    #[test]
+    fn test_evaluate_func() {
+        let res: Lit = evaluate(
+            parse(
+                "((fn add1 (num) (+ num 1))
+                  (add1 1))",
+            )
+            .unwrap()
+            .into(),
+        )
+        .unwrap();
+        let target: Lit = Lit::I64(2);
+
+        assert_eq!(res, target);
+    }
+
+    #[test]
+    fn test_evaluate_func_rec() {
+        let res: Lit = evaluate(
+            parse(
+                "((fn exp (base exponent)
+                     (if (== exponent 0)
+                         1
+                         (* base (exp base (- exponent 1)))))
+                  (exp 2 4))",
+            )
+            .unwrap()
+            .into(),
+        )
+        .unwrap();
+        let target: Lit = Lit::I64(16);
+
+        assert_eq!(res, target);
+    }
+
+    #[test]
+    fn test_evaluate_and() {
+        let res: Lit = evaluate(parse("((&& true false))").unwrap().into()).unwrap();
+        let target: Lit = Lit::Bool(false);
+
+        assert_eq!(res, target);
+    }
+
+    #[test]
+    fn test_evaluate_or_1() {
+        let res: Lit = evaluate(parse("((|| true false))").unwrap().into()).unwrap();
+        let target: Lit = Lit::Bool(true);
+
+        assert_eq!(res, target);
+    }
+
+    #[test]
+    fn test_evaluate_or_2() {
+        let res: Lit = evaluate(parse("((|| (== 1 1) (== true false)))").unwrap().into()).unwrap();
+        let target: Lit = Lit::Bool(true);
+
+        assert_eq!(res, target);
+    }
+
+    #[test]
+    fn test_evaluate_concat() {
+        let res: Lit = evaluate(parse(r#"((++ "hey" "there")))"#).unwrap().into()).unwrap();
+        let target: Lit = Lit::String("hey there".to_string());
+
+        assert_eq!(res, target);
     }
 }

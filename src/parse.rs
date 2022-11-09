@@ -34,6 +34,7 @@ fn string(input: &[u8]) -> IResult<&[u8], Elem> {
     let (input, _) = tag("\"")(input)?;
     let (input, elem) = take_while1(string_char)(input)?;
     let (input, _) = tag("\"")(input)?;
+    let (input, _) = take_while(skip_char)(input)?;
 
     let result = from_utf8(elem).map_err(|_| {
         nom::Err::Error(Error {
@@ -63,10 +64,10 @@ fn symbol(input: &[u8]) -> IResult<&[u8], Elem> {
 
 fn list(input: &[u8]) -> IResult<&[u8], Elem> {
     let (input, _) = take_while(skip_char)(input)?;
-    let (input, _) = paren_left(input)?;
+    let (input, _) = dbg!(paren_left(input)?);
     let (input, _) = take_while(skip_char)(input)?;
-    let (input, symbols) = many0(alt((string, symbol, list)))(input)?;
-    let (input, _) = paren_right(input)?;
+    let (input, symbols) = dbg!(many0(alt((string, symbol, list)))(input)?);
+    let (input, _) = dbg!(paren_right(input)?);
     let (input, _) = take_while(skip_char)(input)?;
     Ok((input, Elem::List(symbols)))
 }
@@ -74,7 +75,12 @@ fn list(input: &[u8]) -> IResult<&[u8], Elem> {
 pub fn parse(input: &str) -> Result<Elem, String> {
     list(input.as_bytes())
         .map(|(_, elem)| elem)
-        .map_err(|err| format!("Parse error: {:?}", err))
+        .map_err(|err| match err {
+            nom::Err::Error(Error { input, code: _ }) => std::str::from_utf8(input)
+                .map(|str| str.to_string())
+                .unwrap_or_else(|_| format!("{:?}", input)),
+            _ => err.to_string(),
+        })
 }
 
 #[cfg(test)]

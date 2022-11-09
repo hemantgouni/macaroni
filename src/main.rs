@@ -20,7 +20,6 @@ fn main() -> io::Result<()> {
     let ast: Toplevel = parse::parse(&contents).unwrap().into();
     let res = evaluate::evaluate(ast.clone());
 
-    println!("AST: {:#?}", ast);
     println!("Result: {:#?}", res);
 
     Ok(())

@@ -25,6 +25,14 @@ impl From<Elem<'_>> for AST {
                     Box::new(expr1.clone().into()),
                     Box::new(expr2.clone().into()),
                 ),
+                [Elem::Symbol("&&"), expr1, expr2] => AST::And(
+                    Box::new(expr1.clone().into()),
+                    Box::new(expr2.clone().into()),
+                ),
+                [Elem::Symbol("||"), expr1, expr2] => AST::Or(
+                    Box::new(expr1.clone().into()),
+                    Box::new(expr2.clone().into()),
+                ),
                 [Elem::Symbol("quote"), rest @ ..] => AST::Quote(
                     rest.iter()
                         .map(|elem| elem.to_owned().into())
