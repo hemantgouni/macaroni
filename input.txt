@@ -1,1 +1,5 @@
-((let a 4 (+ (+ 1 1) (+ 1 a))))
+((fn exp (base exponent)
+    (if (== exponent 0)
+        1
+        (* base (exp base (- exponent 1)))))
+ (exp 1 1))
