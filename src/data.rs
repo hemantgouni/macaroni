@@ -9,12 +9,12 @@ pub enum Elem<'a> {
 pub struct Toplevel(pub Vec<AST>);
 
 #[derive(Debug, Eq, PartialEq, Clone)]
-pub struct Ident(String);
+pub struct Ident(pub String);
 
 impl From<&str> for Ident {
     fn from(str: &str) -> Ident {
         match str {
-            "fn" | "macro" => panic!(
+            "fn" | "macro" | "quote" | "unquote" | "let" | "++" | "-" | "/" | "+" | "*" => panic!(
                 "Special form encountered where an identifier was expected: {}",
                 str
             ),
@@ -24,7 +24,7 @@ impl From<&str> for Ident {
 }
 
 #[derive(Debug, Eq, PartialEq, Clone)]
-pub enum Value {
+pub enum Lit {
     I64(i64),
     String(String),
 }
@@ -34,7 +34,7 @@ pub enum AST {
     Func(Ident, Vec<AST>, Box<AST>),
     Call(Ident, Vec<AST>),
     Macro(Ident, Vec<AST>, Box<AST>),
-    Value(Value),
+    Lit(Lit),
     Symbol(Ident),
     Quote(Vec<AST>),
     Unquote(Vec<AST>),

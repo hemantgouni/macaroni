@@ -1,14 +1,14 @@
-use crate::data::{Elem, Toplevel, Value, AST};
+use crate::data::{Elem, Lit, Toplevel, AST};
 
 // parses all non-toplevel expressions
 impl From<Elem<'_>> for AST {
     fn from(elem: Elem) -> AST {
         match elem {
-            Elem::String(str) => AST::Value(Value::String(str.into())),
+            Elem::String(str) => AST::Lit(Lit::String(str.into())),
             Elem::Symbol(str) => str
                 .to_string()
                 .parse::<i64>()
-                .map(|int| AST::Value(Value::I64(int)))
+                .map(|int| AST::Lit(Lit::I64(int)))
                 .unwrap_or_else(|_| AST::Symbol(str.into())),
             Elem::List(elems) => match elems.as_slice() {
                 [Elem::Symbol("quote"), rest @ ..] => AST::Quote(
@@ -43,7 +43,9 @@ impl From<Elem<'_>> for AST {
                 }
                 [Elem::Symbol(ident), rest @ ..] => AST::Call(
                     (*ident).into(),
-                    rest.iter().map(|elem| dbg!(elem).to_owned().into()).collect(),
+                    rest.iter()
+                        .map(|elem| elem.to_owned().into())
+                        .collect(),
                 ),
                 other => panic!("Unable to abstractify: {:#?}", other),
             },
@@ -95,10 +97,10 @@ mod test {
         let res: AST = parse("(let a 4 (+ a 4))").unwrap().into();
         let target: AST = AST::Let(
             "a".into(),
-            Box::new(AST::Value(Value::I64(4))),
+            Box::new(AST::Lit(Lit::I64(4))),
             Box::new(AST::Add(
                 Box::new(AST::Symbol("a".into())),
-                Box::new(AST::Value(Value::I64(4))),
+                Box::new(AST::Lit(Lit::I64(4))),
             )),
         );
         assert_eq!(res, target)
@@ -109,16 +111,16 @@ mod test {
         let res: AST = parse("(+ (+ 1 1) (+ 1 (+ 1 (+ 1 1))))").unwrap().into();
         let target: AST = AST::Add(
             Box::new(AST::Add(
-                Box::new(AST::Value(Value::I64(1))),
-                Box::new(AST::Value(Value::I64(1))),
+                Box::new(AST::Lit(Lit::I64(1))),
+                Box::new(AST::Lit(Lit::I64(1))),
             )),
             Box::new(AST::Add(
-                Box::new(AST::Value(Value::I64(1))),
+                Box::new(AST::Lit(Lit::I64(1))),
                 Box::new(AST::Add(
-                    Box::new(AST::Value(Value::I64(1))),
+                    Box::new(AST::Lit(Lit::I64(1))),
                     Box::new(AST::Add(
-                        Box::new(AST::Value(Value::I64(1))),
-                        Box::new(AST::Value(Value::I64(1))),
+                        Box::new(AST::Lit(Lit::I64(1))),
+                        Box::new(AST::Lit(Lit::I64(1))),
                     )),
                 )),
             )),
@@ -136,8 +138,8 @@ mod test {
             AST::Symbol("d".into()),
             AST::Symbol("e".into()),
             AST::Add(
-                Box::new(AST::Value(Value::I64(1))),
-                Box::new(AST::Value(Value::I64(1))),
+                Box::new(AST::Lit(Lit::I64(1))),
+                Box::new(AST::Lit(Lit::I64(1))),
             ),
         ]);
         assert_eq!(res, target)
@@ -153,8 +155,8 @@ mod test {
             AST::Symbol("d".into()),
             AST::Symbol("e".into()),
             AST::Add(
-                Box::new(AST::Value(Value::I64(1))),
-                Box::new(AST::Value(Value::I64(1))),
+                Box::new(AST::Lit(Lit::I64(1))),
+                Box::new(AST::Lit(Lit::I64(1))),
             ),
         ]);
         assert_eq!(res, target)
@@ -164,14 +166,14 @@ mod test {
     fn test_from_7() {
         let res: AST = parse("(/ 1 (- 1 (+ 1 (* 1 1))))").unwrap().into();
         let target: AST = AST::Div(
-            Box::new(AST::Value(Value::I64(1))),
+            Box::new(AST::Lit(Lit::I64(1))),
             Box::new(AST::Sub(
-                Box::new(AST::Value(Value::I64(1))),
+                Box::new(AST::Lit(Lit::I64(1))),
                 Box::new(AST::Add(
-                    Box::new(AST::Value(Value::I64(1))),
+                    Box::new(AST::Lit(Lit::I64(1))),
                     Box::new(AST::Mult(
-                        Box::new(AST::Value(Value::I64(1))),
-                        Box::new(AST::Value(Value::I64(1))),
+                        Box::new(AST::Lit(Lit::I64(1))),
+                        Box::new(AST::Lit(Lit::I64(1))),
                     )),
                 )),
             )),
@@ -186,7 +188,7 @@ mod test {
             "add1".into(),
             vec![AST::Symbol("num".into())],
             Box::new(AST::Add(
-                Box::new(AST::Value(Value::I64(1))),
+                Box::new(AST::Lit(Lit::I64(1))),
                 Box::new(AST::Symbol("num".into())),
             )),
         )]);
@@ -209,15 +211,15 @@ mod test {
                 vec![AST::Symbol("num".into())],
                 Box::new(AST::Add(
                     Box::new(AST::Symbol("num".into())),
-                    Box::new(AST::Value(Value::I64(1))),
+                    Box::new(AST::Lit(Lit::I64(1))),
                 )),
             ),
             AST::Let(
                 "a".into(),
-                Box::new(AST::Value(Value::I64(4))),
+                Box::new(AST::Lit(Lit::I64(4))),
                 Box::new(AST::Add(
-                    Box::new(AST::Value(Value::I64(1))),
-                    Box::new(AST::Value(Value::I64(1))),
+                    Box::new(AST::Lit(Lit::I64(1))),
+                    Box::new(AST::Lit(Lit::I64(1))),
                 )),
             ),
         ]);
@@ -240,15 +242,15 @@ mod test {
                 vec![AST::Symbol("num".into())],
                 Box::new(AST::Add(
                     Box::new(AST::Symbol("num".into())),
-                    Box::new(AST::Value(Value::I64(1))),
+                    Box::new(AST::Lit(Lit::I64(1))),
                 )),
             ),
             AST::Let(
                 "a".into(),
-                Box::new(AST::Value(Value::I64(4))),
+                Box::new(AST::Lit(Lit::I64(4))),
                 Box::new(AST::Add(
-                    Box::new(AST::Value(Value::I64(1))),
-                    Box::new(AST::Value(Value::I64(1))),
+                    Box::new(AST::Lit(Lit::I64(1))),
+                    Box::new(AST::Lit(Lit::I64(1))),
                 )),
             ),
         ]);
@@ -259,19 +261,31 @@ mod test {
     #[should_panic]
     #[allow(unused_must_use)]
     fn test_from_12() {
-        <Elem as Into<Toplevel>>::into(parse("(())").unwrap());
+        Toplevel::from(parse("(())").unwrap());
     }
 
     #[test]
     #[should_panic]
     #[allow(unused_must_use)]
     fn test_from_14() {
-        let res = <Elem as Into<Toplevel>>::into(parse("(+ 1 1)").unwrap());
-        println!("{:#?}", res);
+        Toplevel::from(parse("(+ 1 1)").unwrap());
     }
 
     #[test]
+    #[should_panic]
+    #[allow(unused_must_use)]
     fn test_from_15() {
+        Toplevel::from(
+            parse(
+                "((fn add1 (num) (+ 1 num))
+                  (fn 1))",
+            )
+            .unwrap(),
+        );
+    }
+
+    #[test]
+    fn test_from_16() {
         let res: Toplevel = parse(
             "
             ((fn add1 (num)
@@ -287,11 +301,24 @@ mod test {
                 vec![AST::Symbol("num".into())],
                 Box::new(AST::Add(
                     Box::new(AST::Symbol("num".into())),
-                    Box::new(AST::Value(Value::I64(1))),
+                    Box::new(AST::Lit(Lit::I64(1))),
                 )),
             ),
-            AST::Call("add1".into(), vec![AST::Value(Value::I64(1))]),
+            AST::Call("add1".into(), vec![AST::Lit(Lit::I64(1))]),
         ]);
         assert_eq!(res, target);
+    }
+
+    #[test]
+    #[allow(unused_must_use)]
+    fn test_ident_1() {
+        crate::data::Ident::from("variable1");
+    }
+
+    #[test]
+    #[should_panic]
+    #[allow(unused_must_use)]
+    fn test_ident_2() {
+        crate::data::Ident::from("fn");
     }
 }

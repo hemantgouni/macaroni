@@ -1,4 +1,4 @@
 ((fn add1 (num)
     (+ 1 num))
  (fn ret1 () 1)
- (add1 (fn ret1 1)))
+ (add1 (ret1)))
