@@ -237,7 +237,7 @@ mod test {
 
     #[test]
     fn test_evaluate_concat() {
-        let res: Lit = evaluate(parse(r#"((++ "hey" "there")))"#).unwrap().into()).unwrap();
+        let res: Lit = evaluate(parse(r#"((++ "hey " "there")))"#).unwrap().into()).unwrap();
         let target: Lit = Lit::String("hey there".to_string());
 
         assert_eq!(res, target);

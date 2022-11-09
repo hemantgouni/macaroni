@@ -64,10 +64,10 @@ fn symbol(input: &[u8]) -> IResult<&[u8], Elem> {
 
 fn list(input: &[u8]) -> IResult<&[u8], Elem> {
     let (input, _) = take_while(skip_char)(input)?;
-    let (input, _) = dbg!(paren_left(input)?);
+    let (input, _) = paren_left(input)?;
     let (input, _) = take_while(skip_char)(input)?;
-    let (input, symbols) = dbg!(many0(alt((string, symbol, list)))(input)?);
-    let (input, _) = dbg!(paren_right(input)?);
+    let (input, symbols) = many0(alt((string, symbol, list)))(input)?;
+    let (input, _) = paren_right(input)?;
     let (input, _) = take_while(skip_char)(input)?;
     Ok((input, Elem::List(symbols)))
 }
@@ -218,5 +218,20 @@ mod test {
             ]),
         ));
         assert_eq!(res, target)
+    }
+
+    #[test]
+    fn test_list_12() {
+        let res = list(br#"((++ "hey " "there"))"#);
+        let target: Result<(&[u8], Elem), nom::Err<Error<&[u8]>>> = Ok((
+            &[],
+            Elem::List(vec![Elem::List(vec![
+                Elem::Symbol("++"),
+                Elem::String("hey "),
+                Elem::String("there"),
+            ])]),
+        ));
+
+        assert_eq!(res, target);
     }
 }
