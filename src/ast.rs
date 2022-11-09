@@ -111,7 +111,7 @@ impl From<Elem<'_>> for Toplevel {
                     // could appear at the top level
                     _ => elem.to_owned().into(),
                 },
-                _ => panic!("Error: no list of top-level forms provided!"),
+                _ => elem.to_owned().into(),
             }).collect::<Vec<AST>>()),
             // The top level wasn't passed a list of top-level forms, error!
             _ => panic!("Parsing into toplevel form failed: {:#?}", elem),
