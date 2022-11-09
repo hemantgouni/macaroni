@@ -46,16 +46,21 @@ fn evaluate_top(forms: Vec<AST>, mut environment: Env) -> Result<Lit, String> {
 }
 
 fn evaluate_expr(program: AST, mut environment: Env) -> Result<Lit, String> {
-    match program {
-        AST::Call(ident, formal_args) => match environment.lookup(&ident) {
-            Ok(AST::Func(_, actual_args, body)) => {
-                let environment: Env = actual_args
+    match dbg!(program.clone()) {
+        AST::Call(ident, actual_args) => match environment.lookup(&ident) {
+            Ok(AST::Func(_, formal_args, body)) => {
+                let environment: Result<Env, String> = formal_args
                     .iter()
-                    .zip(formal_args.iter())
-                    .fold(environment.to_owned(), |mut env, (ident, ast)| {
-                        env.insert(ident.to_owned(), ast.to_owned())
+                    .zip(actual_args.iter())
+                    .fold(Ok(environment.to_owned()), |env, (ident, ast)| {
+                        Ok(env?.insert(
+                            ident.to_owned(),
+                            // we have to evaluate the binding here, because we need to avoid it
+                            // being defined in terms of itself when e.g. we're recursive
+                            AST::Lit(evaluate_expr(ast.to_owned(), environment.to_owned())?),
+                        ))
                     });
-                evaluate_expr(*body, environment)
+                evaluate_expr(*body, environment?)
             }
             _ => panic!("Could not find function {:?}", ident),
         },
