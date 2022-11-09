@@ -19,7 +19,7 @@ impl Env {
         match self {
             Env(map) => map
                 .get(&string)
-                .map(|ast| ast.clone())
+                .cloned()
                 .ok_or(format!("No binding found: {:?}", string)),
         }
     }
@@ -75,9 +75,8 @@ fn evaluate_expr(program: AST, mut environment: Env) -> Result<Lit, String> {
         },
         AST::Lit(num) => Ok(num),
         AST::Let(Ident(name), bind_expr, body_expr) => {
-            match evaluate_expr(*bind_expr, environment.to_owned())? {
-                res => evaluate_expr(*body_expr, environment.insert(name, AST::Lit(res))),
-            }
+            let res = evaluate_expr(*bind_expr, environment.to_owned())?;
+            evaluate_expr(*body_expr, environment.insert(name, AST::Lit(res)))
         }
         AST::Symbol(Ident(name)) => environment
             .lookup(name)
@@ -97,5 +96,19 @@ mod test {
         let target: Lit = Lit::I64(2);
 
         assert_eq!(res, target);
+    }
+
+    #[test]
+    fn test_evaluate_2() {
+        let res: Lit = evaluate(parse("((let a 4 (+ (+ 1 1) (+ 1 a))))").unwrap().into()).unwrap();
+        let target: Lit = Lit::I64(7);
+
+        assert_eq!(res, target);
+    }
+
+    #[test]
+    #[should_panic]
+    fn test_evaluate_4() {
+        evaluate(parse("((+ a 1))").unwrap().into()).unwrap();
     }
 }
