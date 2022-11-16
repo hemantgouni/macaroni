@@ -38,11 +38,6 @@ impl From<Elem<'_>> for AST {
                         .map(|elem| elem.to_owned().into())
                         .collect::<Vec<AST>>(),
                 ),
-                [Elem::Symbol("unquote"), rest @ ..] => AST::Unquote(
-                    rest.iter()
-                        .map(|elem| elem.to_owned().into())
-                        .collect::<Vec<AST>>(),
-                ),
                 [Elem::Symbol("let"), Elem::Symbol(ident), expr1, expr2] => AST::Let(
                     (*ident).into(),
                     Box::new(expr1.clone().into()),
@@ -164,23 +159,6 @@ mod test {
     fn test_from_4() {
         let res: AST = parse("(quote a b c d e (+ 1 1))").unwrap().into();
         let target: AST = AST::Quote(vec![
-            AST::Symbol("a".into()),
-            AST::Symbol("b".into()),
-            AST::Symbol("c".into()),
-            AST::Symbol("d".into()),
-            AST::Symbol("e".into()),
-            AST::Add(
-                Box::new(AST::Lit(Lit::I64(1))),
-                Box::new(AST::Lit(Lit::I64(1))),
-            ),
-        ]);
-        assert_eq!(res, target)
-    }
-
-    #[test]
-    fn test_from_5() {
-        let res: AST = parse("(unquote a b c d e (+ 1 1))").unwrap().into();
-        let target: AST = AST::Unquote(vec![
             AST::Symbol("a".into()),
             AST::Symbol("b".into()),
             AST::Symbol("c".into()),

@@ -41,7 +41,8 @@ pub enum AST {
     Lit(Lit),
     Symbol(Ident),
     Quote(Vec<AST>),
-    Unquote(Vec<AST>),
+    // consider a different abstractification procedure for when we're in quote
+    List(Vec<AST>),
     Let(Ident, Box<AST>, Box<AST>),
     Ite(Box<AST>, Box<AST>, Box<AST>),
     And(Box<AST>, Box<AST>),
