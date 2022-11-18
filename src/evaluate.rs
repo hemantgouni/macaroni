@@ -92,7 +92,46 @@ fn evaluate_expr(program: AST, mut environment: Env) -> Result<Lit, String> {
             (Lit::I64(num1), Lit::I64(num2)) => Ok(Lit::I64(num1 * num2)),
             _ => Err("Attempted to multiply two non-numbers!".into()),
         },
-        AST::Lit(lit) => Ok(lit),
+        AST::Lit(lit) => match lit {
+            _ => Ok(lit),
+        },
+        AST::List(elems) => Ok(Lit::List(elems.iter().fold(
+            Ok(Vec::new()),
+            |results: Result<Vec<Lit>, String>, elem| {
+                let mut results = results?;
+                results.push(evaluate_expr((*elem).clone(), environment.to_owned())?);
+                Ok(results)
+            },
+        )?)),
+        AST::Car(list) => match evaluate_expr(*list.to_owned(), environment.to_owned())? {
+            Lit::List(lits) => match lits.as_slice() {
+                [first, ..] => Ok((*first).clone()),
+                [] => Err("No elements remaining in list given to car!".to_string()),
+            },
+            other => Err(format!("Non-list given as argument to cons: {:?}", other)),
+        },
+        AST::Cdr(list) => match evaluate_expr(*list.to_owned(), environment.to_owned())? {
+            Lit::List(lits) => match lits.as_slice() {
+                [_, rest @ ..] => Ok(Lit::List(rest.to_vec())),
+                [] => Err("No elements remaining in list given to cdr!".to_string()),
+            },
+            other => Err(format!("Non-list given as argument to cons: {:?}", other)),
+        },
+        AST::Cons(elem, list) => {
+            let elem = evaluate_expr(*elem.to_owned(), environment.to_owned())?;
+            let list = evaluate_expr(*list.to_owned(), environment.to_owned())?;
+
+            match list {
+                Lit::List(mut elems) => {
+                    elems.insert(0, elem);
+                    Ok(Lit::List(elems))
+                }
+                _ => Err(format!(
+                    "Non-list given as a second argument to cons: {:?}",
+                    list
+                )),
+            }
+        }
         AST::Let(ident, bind_expr, body_expr) => {
             let res = evaluate_expr(*bind_expr, environment.to_owned())?;
             evaluate_expr(*body_expr, environment.insert(ident, AST::Lit(res)))
