@@ -14,8 +14,8 @@ pub struct Ident(pub String);
 impl From<&str> for Ident {
     fn from(str: &str) -> Ident {
         match str {
-            "fn" | "macro" | "quote" | "unquote" | "let" | "if" | "++" | "-" | "/" | "+" | "*"
-            | "&&" | "||" => {
+            "fn" | "macro" | "quote" | "unquote" | "let" | "list" | "if" | "++" | "-" | "/"
+            | "+" | "*" | "&&" | "||" => {
                 panic!(
                     "Special form encountered where an identifier was expected: {}",
                     str
@@ -31,6 +31,7 @@ pub enum Lit {
     I64(i64),
     Bool(bool),
     String(String),
+    List(Vec<Lit>)
 }
 
 #[derive(Debug, Eq, PartialEq, Clone)]
@@ -43,6 +44,9 @@ pub enum AST {
     Quote(Vec<AST>),
     // consider a different abstractification procedure for when we're in quote
     List(Vec<AST>),
+    Cons(Box<AST>, Box<AST>),
+    Car(Box<AST>),
+    Cdr(Box<AST>),
     Let(Ident, Box<AST>, Box<AST>),
     Ite(Box<AST>, Box<AST>, Box<AST>),
     And(Box<AST>, Box<AST>),

@@ -16,6 +16,14 @@ impl From<Elem<'_>> for AST {
                         .unwrap_or_else(|_| AST::Symbol(str.into()))
                 }),
             Elem::List(elems) => match elems.as_slice() {
+                [Elem::Symbol("list"), rest @ ..] => {
+                    AST::List(rest.iter().map(|elem| elem.clone().into()).collect())
+                }
+                [Elem::Symbol("cons"), elem, list] => {
+                    AST::Cons(Box::new(elem.clone().into()), Box::new(list.clone().into()))
+                }
+                [Elem::Symbol("car"), list] => AST::Car(Box::new(list.clone().into())),
+                [Elem::Symbol("cdr"), list] => AST::Cdr(Box::new(list.clone().into())),
                 [Elem::Symbol("if"), cond_expr, then_expr, else_expr] => AST::Ite(
                     Box::new(cond_expr.clone().into()),
                     Box::new(then_expr.clone().into()),
@@ -331,4 +339,7 @@ mod test {
     fn test_ident_2() {
         crate::data::Ident::from("fn");
     }
+
+    #[test]
+    fn test_list_1() {}
 }
