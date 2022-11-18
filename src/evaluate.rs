@@ -361,4 +361,24 @@ mod test {
 
         assert_eq!(res, target);
     }
+
+    #[test]
+    fn test_list_4() {
+        let res: Lit = evaluate(
+            parse(r#"((cons (+ 2 5) (list (+ 2 5) (+ 2 5) 3 4 7)))"#)
+                .unwrap()
+                .into(),
+        )
+        .unwrap();
+        let target: Lit = Lit::List(vec![
+            Lit::I64(7),
+            Lit::I64(7),
+            Lit::I64(7),
+            Lit::I64(3),
+            Lit::I64(4),
+            Lit::I64(7),
+        ]);
+
+        assert_eq!(res, target);
+    }
 }
