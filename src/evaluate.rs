@@ -281,4 +281,84 @@ mod test {
 
         assert_eq!(res, target);
     }
+
+    #[test]
+    fn test_litlist_1() {
+        let res: Lit = evaluate(parse(r#"((list 4 4 4 7 7 7 7))"#).unwrap().into()).unwrap();
+        let target: Lit = Lit::List(vec![
+            Lit::I64(4),
+            Lit::I64(4),
+            Lit::I64(4),
+            Lit::I64(7),
+            Lit::I64(7),
+            Lit::I64(7),
+            Lit::I64(7),
+        ]);
+
+        assert_eq!(res, target);
+    }
+
+    #[test]
+    fn test_litlist_2() {
+        let res: Lit = evaluate(
+            parse(r#"((list 4 4 4 7 (+ 3 4) 7 (+ 3 4)))"#)
+                .unwrap()
+                .into(),
+        )
+        .unwrap();
+        let target: Lit = Lit::List(vec![
+            Lit::I64(4),
+            Lit::I64(4),
+            Lit::I64(4),
+            Lit::I64(7),
+            Lit::I64(7),
+            Lit::I64(7),
+            Lit::I64(7),
+        ]);
+
+        assert_eq!(res, target);
+    }
+
+    #[test]
+    fn test_car() {
+        let res: Lit = evaluate(parse(r#"((car (list 4 4 4 7 7 7 7)))"#).unwrap().into()).unwrap();
+        let target: Lit = Lit::I64(4);
+
+        assert_eq!(res, target);
+    }
+
+    #[test]
+    fn test_cdr() {
+        let res: Lit =
+            evaluate(parse(r#"((cdr (list 4 4 4 4 7 7 7 7)))"#).unwrap().into()).unwrap();
+        let target: Lit = Lit::List(vec![
+            Lit::I64(4),
+            Lit::I64(4),
+            Lit::I64(4),
+            Lit::I64(7),
+            Lit::I64(7),
+            Lit::I64(7),
+            Lit::I64(7),
+        ]);
+
+        assert_eq!(res, target);
+    }
+
+    #[test]
+    fn test_cons() {
+        let res: Lit =
+            evaluate(parse(r#"((cons 4 (list 4 4 4 7 7 7 7)))"#).unwrap().into()).unwrap();
+        let target: Lit = Lit::List(vec![
+            Lit::I64(4),
+            Lit::I64(4),
+            Lit::I64(4),
+            Lit::I64(4),
+            Lit::I64(7),
+            Lit::I64(7),
+            Lit::I64(7),
+            Lit::I64(7),
+        ]);
+
+        assert_eq!(res, target);
+    }
 }
