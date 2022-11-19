@@ -24,12 +24,21 @@ impl From<Elem<'_>> for AST {
                 }
                 [Elem::Symbol("car"), list] => AST::Car(Box::new(list.clone().into())),
                 [Elem::Symbol("cdr"), list] => AST::Cdr(Box::new(list.clone().into())),
+                [Elem::Symbol("empty?"), list] => AST::Emptyp(Box::new(list.clone().into())),
                 [Elem::Symbol("if"), cond_expr, then_expr, else_expr] => AST::Ite(
                     Box::new(cond_expr.clone().into()),
                     Box::new(then_expr.clone().into()),
                     Box::new(else_expr.clone().into()),
                 ),
                 [Elem::Symbol("=="), expr1, expr2] => AST::Eq(
+                    Box::new(expr1.clone().into()),
+                    Box::new(expr2.clone().into()),
+                ),
+                [Elem::Symbol("<"), expr1, expr2] => AST::Lt(
+                    Box::new(expr1.clone().into()),
+                    Box::new(expr2.clone().into()),
+                ),
+                [Elem::Symbol(">"), expr1, expr2] => AST::Gt(
                     Box::new(expr1.clone().into()),
                     Box::new(expr2.clone().into()),
                 ),
@@ -62,6 +71,9 @@ impl From<Elem<'_>> for AST {
                 }
                 [Elem::Symbol("/"), num1, num2] => {
                     AST::Div(Box::new(num1.clone().into()), Box::new(num2.clone().into()))
+                }
+                [Elem::Symbol("%"), num1, num2] => {
+                    AST::Mod(Box::new(num1.clone().into()), Box::new(num2.clone().into()))
                 }
                 [Elem::Symbol("*"), num1, num2] => {
                     AST::Mult(Box::new(num1.clone().into()), Box::new(num2.clone().into()))

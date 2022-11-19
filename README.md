@@ -1,3 +1,9 @@
+Macaroni is a language for prototyping easy-to-use analysis-aware macros
+(without having to rely on things like elaborator programming). It currently
+implements a simple dynamically typed lisp-like language. Here's an example
+program that sorts a list: 
+
+```lisp
 ((fn length (input-list)
    (if (empty? input-list) 0 (+ 1 (length (cdr input-list)))))
  (fn merge (input-list-1 input-list-2)
@@ -23,3 +29,8 @@
          (merge (sort (take half-length input-list))
                 (sort (drop half-length input-list))))))
  (sort (list 8 11 3 4 7)))
+```
+
+As you can see, it's pretty minimal. The end goal is to have a macro system
+capable of interleaving macro expansion with existing compiler analyses,
+conditionally generating code based on analysis results. 

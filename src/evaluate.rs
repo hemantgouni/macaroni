@@ -64,30 +64,37 @@ fn evaluate_expr(program: AST, mut environment: Env) -> Result<Lit, String> {
             }
             _ => panic!("Could not find function {:?}", ident),
         },
-        AST::Add(expr1, expr2) => match (
-            evaluate_expr(*expr1, environment.to_owned())?,
-            evaluate_expr(*expr2, environment.to_owned())?,
+        AST::Add(num1, num2) => match (
+            evaluate_expr(*num1, environment.to_owned())?,
+            evaluate_expr(*num2, environment.to_owned())?,
         ) {
             (Lit::I64(num1), Lit::I64(num2)) => Ok(Lit::I64(num1 + num2)),
             _ => Err("Attempted to add two non-numbers!".into()),
         },
-        AST::Sub(expr1, expr2) => match (
-            evaluate_expr(*expr1, environment.to_owned())?,
-            evaluate_expr(*expr2, environment.to_owned())?,
+        AST::Sub(num1, num2) => match (
+            evaluate_expr(*num1, environment.to_owned())?,
+            evaluate_expr(*num2, environment.to_owned())?,
         ) {
             (Lit::I64(num1), Lit::I64(num2)) => Ok(Lit::I64(num1 - num2)),
             _ => Err("Attempted to subtract two non-numbers!".into()),
         },
-        AST::Div(expr1, expr2) => match (
-            evaluate_expr(*expr1, environment.to_owned())?,
-            evaluate_expr(*expr2, environment.to_owned())?,
+        AST::Div(num1, num2) => match (
+            evaluate_expr(*num1, environment.to_owned())?,
+            evaluate_expr(*num2, environment.to_owned())?,
         ) {
             (Lit::I64(num1), Lit::I64(num2)) => Ok(Lit::I64(num1 / num2)),
             _ => Err("Attempted to divide two non-numbers!".into()),
         },
-        AST::Mult(expr1, expr2) => match (
-            evaluate_expr(*expr1, environment.to_owned())?,
-            evaluate_expr(*expr2, environment.to_owned())?,
+        AST::Mod(num1, num2) => match (
+            evaluate_expr(*num1, environment.to_owned())?,
+            evaluate_expr(*num2, environment.to_owned())?,
+        ) {
+            (Lit::I64(num1), Lit::I64(num2)) => Ok(Lit::I64(num1 % num2)),
+            _ => Err("Attempted to take the modulus of two non-numbers!".into()),
+        },
+        AST::Mult(num1, num2) => match (
+            evaluate_expr(*num1, environment.to_owned())?,
+            evaluate_expr(*num2, environment.to_owned())?,
         ) {
             (Lit::I64(num1), Lit::I64(num2)) => Ok(Lit::I64(num1 * num2)),
             _ => Err("Attempted to multiply two non-numbers!".into()),
@@ -132,6 +139,16 @@ fn evaluate_expr(program: AST, mut environment: Env) -> Result<Lit, String> {
                 )),
             }
         }
+        AST::Emptyp(list) => match evaluate_expr(*list, environment.clone())? {
+            Lit::List(list) => Ok(match list.as_slice() {
+                [] => Lit::Bool(true),
+                [..] => Lit::Bool(false),
+            }),
+            other => Err(format!(
+                "Non-list given as an argument to empty?: {:?}",
+                other
+            )),
+        },
         AST::Let(ident, bind_expr, body_expr) => {
             let res = evaluate_expr(*bind_expr, environment.to_owned())?;
             evaluate_expr(*body_expr, environment.insert(ident, AST::Lit(res)))
@@ -159,6 +176,20 @@ fn evaluate_expr(program: AST, mut environment: Env) -> Result<Lit, String> {
             (Lit::Bool(bool1), Lit::Bool(bool2)) => Ok(Lit::Bool(bool1 == bool2)),
             (Lit::String(str1), Lit::String(str2)) => Ok(Lit::Bool(str1 == str2)),
             other => panic!("Differing types given to ==: {:?}", other),
+        },
+        AST::Lt(expr1, expr2) => match (
+            evaluate_expr(*expr1, environment.to_owned())?,
+            evaluate_expr(*expr2, environment.to_owned())?,
+        ) {
+            (Lit::I64(num1), Lit::I64(num2)) => Ok(Lit::Bool(num1 < num2)),
+            other => panic!("Non-numeric argument(s) given to <: {:?}", other),
+        },
+        AST::Gt(expr1, expr2) => match (
+            evaluate_expr(*expr1, environment.to_owned())?,
+            evaluate_expr(*expr2, environment.to_owned())?,
+        ) {
+            (Lit::I64(num1), Lit::I64(num2)) => Ok(Lit::Bool(num1 > num2)),
+            other => panic!("Non-numeric argument(s) given to >: {:?}", other),
         },
         AST::And(expr1, expr2) => match (
             evaluate_expr(*expr1, environment.to_owned())?,
@@ -378,6 +409,19 @@ mod test {
             Lit::I64(4),
             Lit::I64(7),
         ]);
+
+        assert_eq!(res, target);
+    }
+
+    #[test]
+    fn test_list_5() {
+        let res: Lit = evaluate(
+            parse(r#"((car (car (cdr (cons (+ 1 1) (list (list 4)))))))"#)
+                .unwrap()
+                .into(),
+        )
+        .unwrap();
+        let target: Lit = Lit::I64(4);
 
         assert_eq!(res, target);
     }
