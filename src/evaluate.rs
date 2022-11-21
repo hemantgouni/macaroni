@@ -425,4 +425,188 @@ mod test {
 
         assert_eq!(res, target);
     }
+    
+    #[test]
+    fn test_sort_empty() {
+        let res: Lit = evaluate(
+            parse(
+                r#"
+                ((fn length (input-list)
+                   (if (empty? input-list) 0 (+ 1 (length (cdr input-list)))))
+                 (fn merge (input-list-1 input-list-2)
+                   (if (empty? input-list-1)
+                       input-list-2
+                       (if (empty? input-list-2)
+                           input-list-1
+                           (let elem-1 (car input-list-1)
+                             (let elem-2 (car input-list-2)
+                               (if (< elem-1 elem-2)
+                                   (cons elem-1 (merge (cdr input-list-1) input-list-2))
+                                   (cons elem-2 (merge input-list-1 (cdr input-list-2)))))))))
+                 (fn take (num input-list)
+                   (if (== num 0)
+                       (list)
+                       (cons (car input-list) (take (- num 1) (cdr input-list)))))
+                 (fn drop (num input-list)
+                   (if (== num 0) input-list (drop (- num 1) (cdr input-list))))
+                 (fn sort (input-list)
+                   (if (|| (empty? input-list) (== (length input-list) 1))
+                       input-list
+                       (let half-length (/ (length input-list) 2)
+                         (merge (sort (take half-length input-list))
+                                (sort (drop half-length input-list))))))
+                 (sort (list)))
+                "#,
+            )
+            .unwrap()
+            .into(),
+        )
+        .unwrap();
+
+        let target: Lit = Lit::List(Vec::new());
+
+        assert_eq!(res, target);
+    }
+
+    #[test]
+    fn test_sort_singleton() {
+        let res: Lit = evaluate(
+            parse(
+                r#"
+                ((fn length (input-list)
+                   (if (empty? input-list) 0 (+ 1 (length (cdr input-list)))))
+                 (fn merge (input-list-1 input-list-2)
+                   (if (empty? input-list-1)
+                       input-list-2
+                       (if (empty? input-list-2)
+                           input-list-1
+                           (let elem-1 (car input-list-1)
+                             (let elem-2 (car input-list-2)
+                               (if (< elem-1 elem-2)
+                                   (cons elem-1 (merge (cdr input-list-1) input-list-2))
+                                   (cons elem-2 (merge input-list-1 (cdr input-list-2)))))))))
+                 (fn take (num input-list)
+                   (if (== num 0)
+                       (list)
+                       (cons (car input-list) (take (- num 1) (cdr input-list)))))
+                 (fn drop (num input-list)
+                   (if (== num 0) input-list (drop (- num 1) (cdr input-list))))
+                 (fn sort (input-list)
+                   (if (|| (empty? input-list) (== (length input-list) 1))
+                       input-list
+                       (let half-length (/ (length input-list) 2)
+                         (merge (sort (take half-length input-list))
+                                (sort (drop half-length input-list))))))
+                 (sort (list 1)))
+                "#,
+            )
+            .unwrap()
+            .into(),
+        )
+        .unwrap();
+
+        let target: Lit = Lit::List(vec![Lit::I64(1)]);
+
+        assert_eq!(res, target);
+    }
+
+    #[test]
+    fn test_sort_id() {
+        let res: Lit = evaluate(
+            parse(
+                r#"
+                ((fn length (input-list)
+                   (if (empty? input-list) 0 (+ 1 (length (cdr input-list)))))
+                 (fn merge (input-list-1 input-list-2)
+                   (if (empty? input-list-1)
+                       input-list-2
+                       (if (empty? input-list-2)
+                           input-list-1
+                           (let elem-1 (car input-list-1)
+                             (let elem-2 (car input-list-2)
+                               (if (< elem-1 elem-2)
+                                   (cons elem-1 (merge (cdr input-list-1) input-list-2))
+                                   (cons elem-2 (merge input-list-1 (cdr input-list-2)))))))))
+                 (fn take (num input-list)
+                   (if (== num 0)
+                       (list)
+                       (cons (car input-list) (take (- num 1) (cdr input-list)))))
+                 (fn drop (num input-list)
+                   (if (== num 0) input-list (drop (- num 1) (cdr input-list))))
+                 (fn sort (input-list)
+                   (if (|| (empty? input-list) (== (length input-list) 1))
+                       input-list
+                       (let half-length (/ (length input-list) 2)
+                         (merge (sort (take half-length input-list))
+                                (sort (drop half-length input-list))))))
+                 (sort (list 3 4 8 7 7 11 11)))
+                "#,
+            )
+            .unwrap()
+            .into(),
+        )
+        .unwrap();
+
+        let target: Lit = Lit::List(vec![
+            Lit::I64(3),
+            Lit::I64(4),
+            Lit::I64(7),
+            Lit::I64(7),
+            Lit::I64(8),
+            Lit::I64(11),
+            Lit::I64(11),
+        ]);
+
+        assert_eq!(res, target);
+    }
+
+    #[test]
+    fn test_sort() {
+        let res: Lit = evaluate(
+            parse(
+                r#"
+                ((fn length (input-list)
+                   (if (empty? input-list) 0 (+ 1 (length (cdr input-list)))))
+                 (fn merge (input-list-1 input-list-2)
+                   (if (empty? input-list-1)
+                       input-list-2
+                       (if (empty? input-list-2)
+                           input-list-1
+                           (let elem-1 (car input-list-1)
+                             (let elem-2 (car input-list-2)
+                               (if (< elem-1 elem-2)
+                                   (cons elem-1 (merge (cdr input-list-1) input-list-2))
+                                   (cons elem-2 (merge input-list-1 (cdr input-list-2)))))))))
+                 (fn take (num input-list)
+                   (if (== num 0)
+                       (list)
+                       (cons (car input-list) (take (- num 1) (cdr input-list)))))
+                 (fn drop (num input-list)
+                   (if (== num 0) input-list (drop (- num 1) (cdr input-list))))
+                 (fn sort (input-list)
+                   (if (|| (empty? input-list) (== (length input-list) 1))
+                       input-list
+                       (let half-length (/ (length input-list) 2)
+                         (merge (sort (take half-length input-list))
+                                (sort (drop half-length input-list))))))
+                 (sort (list 8 3 4 11 7 11 7)))
+                "#,
+            )
+            .unwrap()
+            .into(),
+        )
+        .unwrap();
+
+        let target: Lit = Lit::List(vec![
+            Lit::I64(3),
+            Lit::I64(4),
+            Lit::I64(7),
+            Lit::I64(7),
+            Lit::I64(8),
+            Lit::I64(11),
+            Lit::I64(11),
+        ]);
+
+        assert_eq!(res, target);
+    }
 }

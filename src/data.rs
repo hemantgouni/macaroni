@@ -14,9 +14,8 @@ pub struct Ident(pub String);
 impl From<&str> for Ident {
     fn from(str: &str) -> Ident {
         match str {
-            "fn" | "macro" | "quote" | "unquote" | "let" | "list" | "if" | "++" | "-" | "/"
-            | "%" | "+" | "*" | "&&" | "||" | "empty?" | "cons" | "car" | "cdr" | "==" | "<"
-            | ">" => {
+            "%" | "&&" | "*" | "+" | "++" | "-" | "/" | "<" | "==" | ">" | "||" | "car" | "cdr"
+            | "cons" | "empty?" | "fn" | "if" | "let" | "list" | "macro" | "quote" | "unquote" => {
                 panic!(
                     "Special form encountered where an identifier was expected: {}",
                     str
