@@ -7,7 +7,7 @@
            input-list-1
            (let elem-1 (car input-list-1)
              (let elem-2 (car input-list-2)
-               (if (|| (< elem-1 elem-2) (== elem-1 elem-2))
+               (if (< elem-1 elem-2)
                    (cons elem-1 (merge (cdr input-list-1) input-list-2))
                    (cons elem-2 (merge input-list-1 (cdr input-list-2)))))))))
  (fn take (num input-list)
