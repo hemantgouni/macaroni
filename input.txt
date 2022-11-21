@@ -22,4 +22,4 @@
        (let half-length (/ (length input-list) 2)
          (merge (sort (take half-length input-list))
                 (sort (drop half-length input-list))))))
- (sort (list 8 11 3 4 7)))
+ (sort (list 8 11 3 4 7 11 7)))
