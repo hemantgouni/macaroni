@@ -215,8 +215,9 @@ fn evaluate_expr(program: AST, mut environment: Env) -> Result<Lit, String> {
         AST::Ident(ident) => environment
             .lookup(&ident)
             .map(|expr| evaluate_expr(expr, environment))?,
-        AST::Quote(expr) => match expr {
-            _ => panic!()
+        AST::Quote(lit) => match *lit {
+            AST::Lit(lit) => Ok(lit),
+            other => Err(format!("Something went wrong parsing quote: {:?}", other)),
         },
         _ => Err(format!("Unable to evaluate the tree {:?}", program)),
     }
@@ -428,7 +429,7 @@ mod test {
 
         assert_eq!(res, target);
     }
-    
+
     #[test]
     fn test_sort_empty() {
         let res: Lit = evaluate(

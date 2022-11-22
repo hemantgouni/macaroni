@@ -50,11 +50,7 @@ impl From<Elem<'_>> for AST {
                     Box::new(expr1.clone().into()),
                     Box::new(expr2.clone().into()),
                 ),
-                [Elem::Symbol("quote"), rest @ ..] => AST::Quote(
-                    rest.iter()
-                        .map(|elem| elem.to_owned().into())
-                        .collect::<Vec<AST>>(),
-                ),
+                [Elem::Symbol("quote"), rest] => AST::Quote(Box::new(AST::Lit(quote_elem(rest)))),
                 [Elem::Symbol("let"), Elem::Symbol(ident), expr1, expr2] => AST::Let(
                     (*ident).into(),
                     Box::new(expr1.clone().into()),
@@ -85,6 +81,15 @@ impl From<Elem<'_>> for AST {
                 other => panic!("Unable to abstractify: {:#?}", other),
             },
         }
+    }
+}
+
+fn quote_elem(elem: &Elem) -> Lit {
+    // Hey, this is basically the lexed representation of the code!!!!
+    match elem {
+        Elem::String(str) => Lit::String(str.to_string()),
+        Elem::Symbol(str) => Lit::Symbol(str.to_string()),
+        Elem::List(elems) => Lit::List(elems.iter().map(|elem| quote_elem(elem)).collect()),
     }
 }
 
@@ -178,17 +183,18 @@ mod test {
     #[test]
     fn test_from_4() {
         let res: AST = parse("(quote a b c d e (+ 1 1))").unwrap().into();
-        let target: AST = AST::Quote(vec![
-            AST::Ident("a".into()),
-            AST::Ident("b".into()),
-            AST::Ident("c".into()),
-            AST::Ident("d".into()),
-            AST::Ident("e".into()),
-            AST::Add(
-                Box::new(AST::Lit(Lit::I64(1))),
-                Box::new(AST::Lit(Lit::I64(1))),
-            ),
-        ]);
+        let target: AST = AST::Quote(Box::new(AST::Lit(Lit::List(vec![
+            Lit::Symbol("a".into()),
+            Lit::Symbol("b".into()),
+            Lit::Symbol("c".into()),
+            Lit::Symbol("d".into()),
+            Lit::Symbol("e".into()),
+            Lit::List(vec![
+                Lit::Symbol("+".into()),
+                Lit::Symbol("1".into()),
+                Lit::Symbol("1".into()),
+            ]),
+        ]))));
         assert_eq!(res, target)
     }
 

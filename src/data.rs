@@ -17,7 +17,7 @@ impl From<&str> for Ident {
             "%" | "&&" | "*" | "+" | "++" | "-" | "/" | "<" | "==" | ">" | "||" | "car" | "cdr"
             | "cons" | "empty?" | "fn" | "if" | "let" | "list" | "macro" | "quote" | "unquote" => {
                 panic!(
-                    "Special form encountered where an identifier was expected: {}",
+                    "Special form used incorrectly: {}",
                     str
                 )
             }
@@ -43,7 +43,7 @@ pub enum AST {
     Lit(Lit),
     Ident(Ident),
     // consider a different abstractification procedure for when we're in quote
-    Quote(Vec<AST>),
+    Quote(Box<AST>),
     List(Vec<AST>),
     Cons(Box<AST>, Box<AST>),
     Car(Box<AST>),
