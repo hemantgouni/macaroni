@@ -13,7 +13,7 @@ impl From<Elem<'_>> for AST {
                     str.to_string()
                         .parse::<bool>()
                         .map(|bool| AST::Lit(Lit::Bool(bool)))
-                        .unwrap_or_else(|_| AST::Symbol(str.into()))
+                        .unwrap_or_else(|_| AST::Ident(str.into()))
                 }),
             Elem::List(elems) => match elems.as_slice() {
                 [Elem::Symbol("list"), rest @ ..] => {
@@ -146,7 +146,7 @@ mod test {
             "a".into(),
             Box::new(AST::Lit(Lit::I64(4))),
             Box::new(AST::Add(
-                Box::new(AST::Symbol("a".into())),
+                Box::new(AST::Ident("a".into())),
                 Box::new(AST::Lit(Lit::I64(4))),
             )),
         );
@@ -179,11 +179,11 @@ mod test {
     fn test_from_4() {
         let res: AST = parse("(quote a b c d e (+ 1 1))").unwrap().into();
         let target: AST = AST::Quote(vec![
-            AST::Symbol("a".into()),
-            AST::Symbol("b".into()),
-            AST::Symbol("c".into()),
-            AST::Symbol("d".into()),
-            AST::Symbol("e".into()),
+            AST::Ident("a".into()),
+            AST::Ident("b".into()),
+            AST::Ident("c".into()),
+            AST::Ident("d".into()),
+            AST::Ident("e".into()),
             AST::Add(
                 Box::new(AST::Lit(Lit::I64(1))),
                 Box::new(AST::Lit(Lit::I64(1))),
@@ -219,7 +219,7 @@ mod test {
             vec!["num".into()],
             Box::new(AST::Add(
                 Box::new(AST::Lit(Lit::I64(1))),
-                Box::new(AST::Symbol("num".into())),
+                Box::new(AST::Ident("num".into())),
             )),
         )]);
         assert_eq!(res, target)
@@ -240,7 +240,7 @@ mod test {
                 "add1".into(),
                 vec!["num".into()],
                 Box::new(AST::Add(
-                    Box::new(AST::Symbol("num".into())),
+                    Box::new(AST::Ident("num".into())),
                     Box::new(AST::Lit(Lit::I64(1))),
                 )),
             ),
@@ -271,7 +271,7 @@ mod test {
                 "add1".into(),
                 vec!["num".into()],
                 Box::new(AST::Add(
-                    Box::new(AST::Symbol("num".into())),
+                    Box::new(AST::Ident("num".into())),
                     Box::new(AST::Lit(Lit::I64(1))),
                 )),
             ),
@@ -330,7 +330,7 @@ mod test {
                 "add1".into(),
                 vec!["num".into()],
                 Box::new(AST::Add(
-                    Box::new(AST::Symbol("num".into())),
+                    Box::new(AST::Ident("num".into())),
                     Box::new(AST::Lit(Lit::I64(1))),
                 )),
             ),

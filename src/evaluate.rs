@@ -212,9 +212,12 @@ fn evaluate_expr(program: AST, mut environment: Env) -> Result<Lit, String> {
             (Lit::String(str1), Lit::String(str2)) => Ok(Lit::String(str1 + &str2)),
             other => panic!("Non-string arguments given to ++: {:?}", other),
         },
-        AST::Symbol(ident) => environment
+        AST::Ident(ident) => environment
             .lookup(&ident)
             .map(|expr| evaluate_expr(expr, environment))?,
+        AST::Quote(expr) => match expr {
+            _ => panic!()
+        },
         _ => Err(format!("Unable to evaluate the tree {:?}", program)),
     }
 }

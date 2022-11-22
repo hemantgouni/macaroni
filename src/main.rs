@@ -2,6 +2,7 @@ mod ast;
 mod data;
 mod evaluate;
 mod parse;
+mod expand;
 
 use std::{env, fs, io};
 

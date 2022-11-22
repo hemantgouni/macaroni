@@ -31,6 +31,7 @@ pub enum Lit {
     I64(i64),
     Bool(bool),
     String(String),
+    Symbol(String),
     List(Vec<Lit>),
 }
 
@@ -40,7 +41,7 @@ pub enum AST {
     Call(Ident, Vec<AST>),
     Macro(Ident, Vec<Ident>, Box<AST>),
     Lit(Lit),
-    Symbol(Ident),
+    Ident(Ident),
     // consider a different abstractification procedure for when we're in quote
     Quote(Vec<AST>),
     List(Vec<AST>),
