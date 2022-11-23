@@ -43,7 +43,7 @@ pub enum AST {
     Lit(Lit),
     Ident(Ident),
     // consider a different abstractification procedure for when we're in quote
-    Quote(Box<AST>),
+    Quote(Lit),
     List(Vec<AST>),
     Cons(Box<AST>, Box<AST>),
     Car(Box<AST>),

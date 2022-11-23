@@ -60,7 +60,7 @@ impl Elem<'_> {
                     Box::new(expr1.clone().parse()),
                     Box::new(expr2.clone().parse()),
                 ),
-                [Elem::Symbol("quote"), rest] => AST::Quote(Box::new(AST::Lit(quote_elem(rest)))),
+                [Elem::Symbol("quote"), rest] => AST::Quote(quote_elem(rest)),
                 [Elem::Symbol("let"), Elem::Symbol(ident), expr1, expr2] => AST::Let(
                     (*ident).into(),
                     Box::new(expr1.clone().parse()),
@@ -188,7 +188,7 @@ mod test {
     #[test]
     fn test_from_4() {
         let res: AST = tokenize("(quote (a b c d e (+ 1 1)))").unwrap().parse();
-        let target: AST = AST::Quote(Box::new(AST::Lit(Lit::List(vec![
+        let target: AST = AST::Quote(Lit::List(vec![
             Lit::Symbol("a".into()),
             Lit::Symbol("b".into()),
             Lit::Symbol("c".into()),
@@ -199,7 +199,7 @@ mod test {
                 Lit::Symbol("1".into()),
                 Lit::Symbol("1".into()),
             ]),
-        ]))));
+        ]));
         assert_eq!(res, target)
     }
 

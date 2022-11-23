@@ -215,10 +215,7 @@ fn evaluate_expr(program: AST, mut environment: Env) -> Result<Lit, String> {
         AST::Ident(ident) => environment
             .lookup(&ident)
             .map(|expr| evaluate_expr(expr, environment))?,
-        AST::Quote(lit) => match *lit {
-            AST::Lit(lit) => Ok(lit),
-            other => Err(format!("Something went wrong parsing quote: {:?}", other)),
-        },
+        AST::Quote(lit) => Ok(lit),
         _ => Err(format!("Unable to evaluate the tree {:?}", program)),
     }
 }
