@@ -19,7 +19,7 @@ fn main() -> io::Result<()> {
     let contents = fs::read_to_string(args.get(1).unwrap_or(&String::from("input.txt")))
         .expect("No such file or directory!");
 
-    let ast: Toplevel = parse::parse(&contents).unwrap().into();
+    let ast: Toplevel = parse::tokenize(&contents).unwrap().parse_toplevel();
     println!("AST: {:#?}", ast);
 
     let res = evaluate::evaluate(ast.clone());

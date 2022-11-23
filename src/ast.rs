@@ -1,9 +1,18 @@
 use crate::data::{Elem, Ident, Lit, Toplevel, AST};
 
+fn quote_elem(elem: &Elem) -> Lit {
+    // Hey, this is basically the lexed representation of the code!!!!
+    match elem {
+        Elem::String(str) => Lit::String(str.to_string()),
+        Elem::Symbol(str) => Lit::Symbol(str.to_string()),
+        Elem::List(elems) => Lit::List(elems.iter().map(|elem| quote_elem(elem)).collect()),
+    }
+}
+
 // parses all non-toplevel expressions
-impl From<Elem<'_>> for AST {
-    fn from(elem: Elem) -> AST {
-        match elem {
+impl Elem<'_> {
+    pub fn parse(self) -> AST {
+        match self {
             Elem::String(str) => AST::Lit(Lit::String(str.into())),
             Elem::Symbol(str) => str
                 .to_string()
@@ -17,86 +26,82 @@ impl From<Elem<'_>> for AST {
                 }),
             Elem::List(elems) => match elems.as_slice() {
                 [Elem::Symbol("list"), rest @ ..] => {
-                    AST::List(rest.iter().map(|elem| elem.clone().into()).collect())
+                    AST::List(rest.iter().map(|elem| elem.clone().parse()).collect())
                 }
-                [Elem::Symbol("cons"), elem, list] => {
-                    AST::Cons(Box::new(elem.clone().into()), Box::new(list.clone().into()))
-                }
-                [Elem::Symbol("car"), list] => AST::Car(Box::new(list.clone().into())),
-                [Elem::Symbol("cdr"), list] => AST::Cdr(Box::new(list.clone().into())),
-                [Elem::Symbol("empty?"), list] => AST::Emptyp(Box::new(list.clone().into())),
+                [Elem::Symbol("cons"), elem, list] => AST::Cons(
+                    Box::new(elem.clone().parse()),
+                    Box::new(list.clone().parse()),
+                ),
+                [Elem::Symbol("car"), list] => AST::Car(Box::new(list.clone().parse())),
+                [Elem::Symbol("cdr"), list] => AST::Cdr(Box::new(list.clone().parse())),
+                [Elem::Symbol("empty?"), list] => AST::Emptyp(Box::new(list.clone().parse())),
                 [Elem::Symbol("if"), cond_expr, then_expr, else_expr] => AST::Ite(
-                    Box::new(cond_expr.clone().into()),
-                    Box::new(then_expr.clone().into()),
-                    Box::new(else_expr.clone().into()),
+                    Box::new(cond_expr.clone().parse()),
+                    Box::new(then_expr.clone().parse()),
+                    Box::new(else_expr.clone().parse()),
                 ),
                 [Elem::Symbol("=="), expr1, expr2] => AST::Eq(
-                    Box::new(expr1.clone().into()),
-                    Box::new(expr2.clone().into()),
+                    Box::new(expr1.clone().parse()),
+                    Box::new(expr2.clone().parse()),
                 ),
                 [Elem::Symbol("<"), expr1, expr2] => AST::Lt(
-                    Box::new(expr1.clone().into()),
-                    Box::new(expr2.clone().into()),
+                    Box::new(expr1.clone().parse()),
+                    Box::new(expr2.clone().parse()),
                 ),
                 [Elem::Symbol(">"), expr1, expr2] => AST::Gt(
-                    Box::new(expr1.clone().into()),
-                    Box::new(expr2.clone().into()),
+                    Box::new(expr1.clone().parse()),
+                    Box::new(expr2.clone().parse()),
                 ),
                 [Elem::Symbol("&&"), expr1, expr2] => AST::And(
-                    Box::new(expr1.clone().into()),
-                    Box::new(expr2.clone().into()),
+                    Box::new(expr1.clone().parse()),
+                    Box::new(expr2.clone().parse()),
                 ),
                 [Elem::Symbol("||"), expr1, expr2] => AST::Or(
-                    Box::new(expr1.clone().into()),
-                    Box::new(expr2.clone().into()),
+                    Box::new(expr1.clone().parse()),
+                    Box::new(expr2.clone().parse()),
                 ),
                 [Elem::Symbol("quote"), rest] => AST::Quote(Box::new(AST::Lit(quote_elem(rest)))),
                 [Elem::Symbol("let"), Elem::Symbol(ident), expr1, expr2] => AST::Let(
                     (*ident).into(),
-                    Box::new(expr1.clone().into()),
-                    Box::new(expr2.clone().into()),
+                    Box::new(expr1.clone().parse()),
+                    Box::new(expr2.clone().parse()),
                 ),
-                [Elem::Symbol("++"), str1, str2] => {
-                    AST::Concat(Box::new(str1.clone().into()), Box::new(str2.clone().into()))
-                }
-                [Elem::Symbol("+"), num1, num2] => {
-                    AST::Add(Box::new(num1.clone().into()), Box::new(num2.clone().into()))
-                }
-                [Elem::Symbol("-"), num1, num2] => {
-                    AST::Sub(Box::new(num1.clone().into()), Box::new(num2.clone().into()))
-                }
-                [Elem::Symbol("/"), num1, num2] => {
-                    AST::Div(Box::new(num1.clone().into()), Box::new(num2.clone().into()))
-                }
-                [Elem::Symbol("%"), num1, num2] => {
-                    AST::Mod(Box::new(num1.clone().into()), Box::new(num2.clone().into()))
-                }
-                [Elem::Symbol("*"), num1, num2] => {
-                    AST::Mult(Box::new(num1.clone().into()), Box::new(num2.clone().into()))
-                }
+                [Elem::Symbol("++"), str1, str2] => AST::Concat(
+                    Box::new(str1.clone().parse()),
+                    Box::new(str2.clone().parse()),
+                ),
+                [Elem::Symbol("+"), num1, num2] => AST::Add(
+                    Box::new(num1.clone().parse()),
+                    Box::new(num2.clone().parse()),
+                ),
+                [Elem::Symbol("-"), num1, num2] => AST::Sub(
+                    Box::new(num1.clone().parse()),
+                    Box::new(num2.clone().parse()),
+                ),
+                [Elem::Symbol("/"), num1, num2] => AST::Div(
+                    Box::new(num1.clone().parse()),
+                    Box::new(num2.clone().parse()),
+                ),
+                [Elem::Symbol("%"), num1, num2] => AST::Mod(
+                    Box::new(num1.clone().parse()),
+                    Box::new(num2.clone().parse()),
+                ),
+                [Elem::Symbol("*"), num1, num2] => AST::Mult(
+                    Box::new(num1.clone().parse()),
+                    Box::new(num2.clone().parse()),
+                ),
                 [Elem::Symbol(ident), rest @ ..] => AST::Call(
                     (*ident).into(),
-                    rest.iter().map(|elem| elem.to_owned().into()).collect(),
+                    rest.iter().map(|elem| elem.to_owned().parse()).collect(),
                 ),
                 other => panic!("Unable to abstractify: {:#?}", other),
             },
         }
     }
-}
 
-fn quote_elem(elem: &Elem) -> Lit {
-    // Hey, this is basically the lexed representation of the code!!!!
-    match elem {
-        Elem::String(str) => Lit::String(str.to_string()),
-        Elem::Symbol(str) => Lit::Symbol(str.to_string()),
-        Elem::List(elems) => Lit::List(elems.iter().map(|elem| quote_elem(elem)).collect()),
-    }
-}
-
-// parses all expressions, plus top-level declarations
-impl From<Elem<'_>> for Toplevel {
-    fn from(elem: Elem) -> Toplevel {
-        match elem {
+    // parses all expressions, plus top-level declarations
+    pub fn parse_toplevel(self) -> Toplevel {
+        match self {
             Elem::List(elems) => Toplevel(elems.iter().map(|elem| match elem {
                 Elem::List(toplevel_form) => match toplevel_form.as_slice() {
                     [Elem::Symbol("fn"), Elem::Symbol(ident), Elem::List(args), body] =>
@@ -111,7 +116,7 @@ impl From<Elem<'_>> for Toplevel {
                                     ),
                                 })
                                 .collect::<Vec<Ident>>(),
-                            Box::new(body.to_owned().into()),
+                            Box::new(body.to_owned().parse()),
                         ),
                     [Elem::Symbol("macro"), Elem::Symbol(ident), Elem::List(args), body] =>
                         AST::Macro(
@@ -125,16 +130,16 @@ impl From<Elem<'_>> for Toplevel {
                                     ),
                                 })
                                 .collect::<Vec<Ident>>(),
-                            Box::new(body.to_owned().into()),
+                            Box::new(body.to_owned().parse()),
                         ),
                     // defer to the AST impl to translate 'normal' exprs which
                     // could appear at the top level
-                    _ => elem.to_owned().into(),
+                    _ => elem.to_owned().parse(),
                 },
-                _ => elem.to_owned().into(),
+                _ => elem.to_owned().parse(),
             }).collect::<Vec<AST>>()),
             // The top level wasn't passed a list of top-level forms, error!
-            _ => panic!("Parsing into toplevel form failed: {:#?}", elem),
+            _ => panic!("Parsing into toplevel form failed: {:#?}", self),
         }
     }
 }
@@ -142,11 +147,11 @@ impl From<Elem<'_>> for Toplevel {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::parse::parse;
+    use crate::parse::tokenize;
 
     #[test]
     fn test_from_1() {
-        let res: AST = parse("(let a 4 (+ a 4))").unwrap().into();
+        let res: AST = tokenize("(let a 4 (+ a 4))").unwrap().parse();
         let target: AST = AST::Let(
             "a".into(),
             Box::new(AST::Lit(Lit::I64(4))),
@@ -160,7 +165,7 @@ mod test {
 
     #[test]
     fn test_from_2() {
-        let res: AST = parse("(+ (+ 1 1) (+ 1 (+ 1 (+ 1 1))))").unwrap().into();
+        let res: AST = tokenize("(+ (+ 1 1) (+ 1 (+ 1 (+ 1 1))))").unwrap().parse();
         let target: AST = AST::Add(
             Box::new(AST::Add(
                 Box::new(AST::Lit(Lit::I64(1))),
@@ -182,7 +187,7 @@ mod test {
 
     #[test]
     fn test_from_4() {
-        let res: AST = parse("(quote (a b c d e (+ 1 1)))").unwrap().into();
+        let res: AST = tokenize("(quote (a b c d e (+ 1 1)))").unwrap().parse();
         let target: AST = AST::Quote(Box::new(AST::Lit(Lit::List(vec![
             Lit::Symbol("a".into()),
             Lit::Symbol("b".into()),
@@ -200,7 +205,7 @@ mod test {
 
     #[test]
     fn test_from_7() {
-        let res: AST = parse("(/ 1 (- 1 (+ 1 (* 1 1))))").unwrap().into();
+        let res: AST = tokenize("(/ 1 (- 1 (+ 1 (* 1 1))))").unwrap().parse();
         let target: AST = AST::Div(
             Box::new(AST::Lit(Lit::I64(1))),
             Box::new(AST::Sub(
@@ -219,7 +224,9 @@ mod test {
 
     #[test]
     fn test_from_8() {
-        let res: Toplevel = parse("((fn add1 (num) (+ 1 num)))").unwrap().into();
+        let res: Toplevel = tokenize("((fn add1 (num) (+ 1 num)))")
+            .unwrap()
+            .parse_toplevel();
         let target: Toplevel = Toplevel(vec![AST::Func(
             "add1".into(),
             vec!["num".into()],
@@ -233,14 +240,14 @@ mod test {
 
     #[test]
     fn test_from_10() {
-        let res: Toplevel = parse(
+        let res: Toplevel = tokenize(
             "((fn add1 (num)
                (+ num 1))
               (let a 4
                (+ 1 1)))",
         )
         .unwrap()
-        .into();
+        .parse_toplevel();
         let target: Toplevel = Toplevel(vec![
             AST::Func(
                 "add1".into(),
@@ -264,14 +271,14 @@ mod test {
 
     #[test]
     fn test_from_11() {
-        let res: Toplevel = parse(
+        let res: Toplevel = tokenize(
             "((macro add1 (num)
                (+ num 1))
               (let a 4
                (+ 1 1)))",
         )
         .unwrap()
-        .into();
+        .parse_toplevel();
         let target: Toplevel = Toplevel(vec![
             AST::Macro(
                 "add1".into(),
@@ -297,32 +304,31 @@ mod test {
     #[should_panic]
     #[allow(unused_must_use)]
     fn test_from_12() {
-        Toplevel::from(parse("(())").unwrap());
+        tokenize("(())").unwrap().parse_toplevel();
     }
 
     #[test]
     #[should_panic]
     #[allow(unused_must_use)]
     fn test_from_14() {
-        Toplevel::from(parse("(+ 1 1)").unwrap());
+        tokenize("(+ 1 1)").unwrap().parse_toplevel();
     }
 
     #[test]
     #[should_panic]
     #[allow(unused_must_use)]
     fn test_from_15() {
-        Toplevel::from(
-            parse(
-                "((fn add1 (num) (+ 1 num))
+        tokenize(
+            "((fn add1 (num) (+ 1 num))
                   (fn 1))",
-            )
-            .unwrap(),
-        );
+        )
+        .unwrap()
+        .parse_toplevel();
     }
 
     #[test]
     fn test_from_16() {
-        let res: Toplevel = parse(
+        let res: Toplevel = tokenize(
             "
             ((fn add1 (num)
               (+ num 1))
@@ -330,7 +336,7 @@ mod test {
         ",
         )
         .unwrap()
-        .into();
+        .parse_toplevel();
         let target: Toplevel = Toplevel(vec![
             AST::Func(
                 "add1".into(),
@@ -357,7 +363,4 @@ mod test {
     fn test_ident_2() {
         crate::data::Ident::from("fn");
     }
-
-    #[test]
-    fn test_list_1() {}
 }

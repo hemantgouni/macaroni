@@ -226,11 +226,11 @@ fn evaluate_expr(program: AST, mut environment: Env) -> Result<Lit, String> {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::parse::parse;
+    use crate::parse::tokenize;
 
     #[test]
     fn test_evaluate_1() {
-        let res: Lit = evaluate(parse("((+ (+ 1 1) (- 1 1)))").unwrap().into()).unwrap();
+        let res: Lit = evaluate(tokenize("((+ (+ 1 1) (- 1 1)))").unwrap().parse_toplevel()).unwrap();
         let target: Lit = Lit::I64(2);
 
         assert_eq!(res, target);
@@ -238,7 +238,7 @@ mod test {
 
     #[test]
     fn test_evaluate_2() {
-        let res: Lit = evaluate(parse("((let a 4 (+ (+ 1 1) (+ 1 a))))").unwrap().into()).unwrap();
+        let res: Lit = evaluate(tokenize("((let a 4 (+ (+ 1 1) (+ 1 a))))").unwrap().parse_toplevel()).unwrap();
         let target: Lit = Lit::I64(7);
 
         assert_eq!(res, target);
@@ -247,18 +247,18 @@ mod test {
     #[test]
     #[should_panic]
     fn test_evaluate_4() {
-        evaluate(parse("((+ a 1))").unwrap().into()).unwrap();
+        evaluate(tokenize("((+ a 1))").unwrap().parse_toplevel()).unwrap();
     }
 
     #[test]
     fn test_evaluate_func() {
         let res: Lit = evaluate(
-            parse(
+            tokenize(
                 "((fn add1 (num) (+ num 1))
                   (add1 1))",
             )
             .unwrap()
-            .into(),
+            .parse_toplevel(),
         )
         .unwrap();
         let target: Lit = Lit::I64(2);
@@ -269,7 +269,7 @@ mod test {
     #[test]
     fn test_evaluate_func_rec() {
         let res: Lit = evaluate(
-            parse(
+            tokenize(
                 "((fn exp (base exponent)
                      (if (== exponent 0)
                          1
@@ -277,7 +277,7 @@ mod test {
                   (exp 2 4))",
             )
             .unwrap()
-            .into(),
+            .parse_toplevel(),
         )
         .unwrap();
         let target: Lit = Lit::I64(16);
@@ -287,7 +287,7 @@ mod test {
 
     #[test]
     fn test_evaluate_and() {
-        let res: Lit = evaluate(parse("((&& true false))").unwrap().into()).unwrap();
+        let res: Lit = evaluate(tokenize("((&& true false))").unwrap().parse_toplevel()).unwrap();
         let target: Lit = Lit::Bool(false);
 
         assert_eq!(res, target);
@@ -295,7 +295,7 @@ mod test {
 
     #[test]
     fn test_evaluate_or_1() {
-        let res: Lit = evaluate(parse("((|| true false))").unwrap().into()).unwrap();
+        let res: Lit = evaluate(tokenize("((|| true false))").unwrap().parse_toplevel()).unwrap();
         let target: Lit = Lit::Bool(true);
 
         assert_eq!(res, target);
@@ -303,7 +303,7 @@ mod test {
 
     #[test]
     fn test_evaluate_or_2() {
-        let res: Lit = evaluate(parse("((|| (== 1 1) (== true false)))").unwrap().into()).unwrap();
+        let res: Lit = evaluate(tokenize("((|| (== 1 1) (== true false)))").unwrap().parse_toplevel()).unwrap();
         let target: Lit = Lit::Bool(true);
 
         assert_eq!(res, target);
@@ -311,7 +311,7 @@ mod test {
 
     #[test]
     fn test_evaluate_concat() {
-        let res: Lit = evaluate(parse(r#"((++ "hey " "there")))"#).unwrap().into()).unwrap();
+        let res: Lit = evaluate(tokenize(r#"((++ "hey " "there")))"#).unwrap().parse_toplevel()).unwrap();
         let target: Lit = Lit::String("hey there".to_string());
 
         assert_eq!(res, target);
@@ -319,7 +319,7 @@ mod test {
 
     #[test]
     fn test_litlist_1() {
-        let res: Lit = evaluate(parse(r#"((list 4 4 4 7 7 7 7))"#).unwrap().into()).unwrap();
+        let res: Lit = evaluate(tokenize(r#"((list 4 4 4 7 7 7 7))"#).unwrap().parse_toplevel()).unwrap();
         let target: Lit = Lit::List(vec![
             Lit::I64(4),
             Lit::I64(4),
@@ -336,9 +336,9 @@ mod test {
     #[test]
     fn test_litlist_2() {
         let res: Lit = evaluate(
-            parse(r#"((list 4 4 4 7 (+ 3 4) 7 (+ 3 4)))"#)
+            tokenize(r#"((list 4 4 4 7 (+ 3 4) 7 (+ 3 4)))"#)
                 .unwrap()
-                .into(),
+                .parse_toplevel(),
         )
         .unwrap();
         let target: Lit = Lit::List(vec![
@@ -356,7 +356,7 @@ mod test {
 
     #[test]
     fn test_car() {
-        let res: Lit = evaluate(parse(r#"((car (list 4 4 4 7 7 7 7)))"#).unwrap().into()).unwrap();
+        let res: Lit = evaluate(tokenize(r#"((car (list 4 4 4 7 7 7 7)))"#).unwrap().parse_toplevel()).unwrap();
         let target: Lit = Lit::I64(4);
 
         assert_eq!(res, target);
@@ -365,7 +365,7 @@ mod test {
     #[test]
     fn test_cdr() {
         let res: Lit =
-            evaluate(parse(r#"((cdr (list 4 4 4 4 7 7 7 7)))"#).unwrap().into()).unwrap();
+            evaluate(tokenize(r#"((cdr (list 4 4 4 4 7 7 7 7)))"#).unwrap().parse_toplevel()).unwrap();
         let target: Lit = Lit::List(vec![
             Lit::I64(4),
             Lit::I64(4),
@@ -382,7 +382,7 @@ mod test {
     #[test]
     fn test_cons() {
         let res: Lit =
-            evaluate(parse(r#"((cons 4 (list 4 4 4 7 7 7 7)))"#).unwrap().into()).unwrap();
+            evaluate(tokenize(r#"((cons 4 (list 4 4 4 7 7 7 7)))"#).unwrap().parse_toplevel()).unwrap();
         let target: Lit = Lit::List(vec![
             Lit::I64(4),
             Lit::I64(4),
@@ -400,9 +400,9 @@ mod test {
     #[test]
     fn test_list_4() {
         let res: Lit = evaluate(
-            parse(r#"((cons (+ 2 5) (list (+ 2 5) (+ 2 5) 3 4 7)))"#)
+            tokenize(r#"((cons (+ 2 5) (list (+ 2 5) (+ 2 5) 3 4 7)))"#)
                 .unwrap()
-                .into(),
+                .parse_toplevel(),
         )
         .unwrap();
         let target: Lit = Lit::List(vec![
@@ -420,9 +420,9 @@ mod test {
     #[test]
     fn test_list_5() {
         let res: Lit = evaluate(
-            parse(r#"((car (car (cdr (cons (+ 1 1) (list (list 4)))))))"#)
+            tokenize(r#"((car (car (cdr (cons (+ 1 1) (list (list 4)))))))"#)
                 .unwrap()
-                .into(),
+                .parse_toplevel(),
         )
         .unwrap();
         let target: Lit = Lit::I64(4);
@@ -433,7 +433,7 @@ mod test {
     #[test]
     fn test_sort_empty() {
         let res: Lit = evaluate(
-            parse(
+            tokenize(
                 r#"
                 ((fn length (input-list)
                    (if (empty? input-list) 0 (+ 1 (length (cdr input-list)))))
@@ -463,7 +463,7 @@ mod test {
                 "#,
             )
             .unwrap()
-            .into(),
+            .parse_toplevel(),
         )
         .unwrap();
 
@@ -475,7 +475,7 @@ mod test {
     #[test]
     fn test_sort_singleton() {
         let res: Lit = evaluate(
-            parse(
+            tokenize(
                 r#"
                 ((fn length (input-list)
                    (if (empty? input-list) 0 (+ 1 (length (cdr input-list)))))
@@ -505,7 +505,7 @@ mod test {
                 "#,
             )
             .unwrap()
-            .into(),
+            .parse_toplevel(),
         )
         .unwrap();
 
@@ -517,7 +517,7 @@ mod test {
     #[test]
     fn test_sort_id() {
         let res: Lit = evaluate(
-            parse(
+            tokenize(
                 r#"
                 ((fn length (input-list)
                    (if (empty? input-list) 0 (+ 1 (length (cdr input-list)))))
@@ -547,7 +547,7 @@ mod test {
                 "#,
             )
             .unwrap()
-            .into(),
+            .parse_toplevel(),
         )
         .unwrap();
 
@@ -567,7 +567,7 @@ mod test {
     #[test]
     fn test_sort() {
         let res: Lit = evaluate(
-            parse(
+            tokenize(
                 r#"
                 ((fn length (input-list)
                    (if (empty? input-list) 0 (+ 1 (length (cdr input-list)))))
@@ -597,7 +597,7 @@ mod test {
                 "#,
             )
             .unwrap()
-            .into(),
+            .parse_toplevel(),
         )
         .unwrap();
 

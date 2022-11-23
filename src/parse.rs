@@ -72,7 +72,7 @@ fn list(input: &[u8]) -> IResult<&[u8], Elem> {
     Ok((input, Elem::List(symbols)))
 }
 
-pub fn parse(input: &str) -> Result<Elem, String> {
+pub fn tokenize(input: &str) -> Result<Elem, String> {
     list(input.as_bytes())
         .map(|(_, elem)| elem)
         .map_err(|err| match err {
