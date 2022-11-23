@@ -1,6 +1,6 @@
 use crate::data::{Elem, Ident, Lit, Toplevel, AST};
 
-fn quote_elem(elem: &Elem) -> Lit {
+fn quote_elem(elem: &Elem<String>) -> Lit {
     // Hey, this is basically the lexed representation of the code!!!!
     match elem {
         Elem::String(str) => Lit::String(str.to_string()),
@@ -10,7 +10,7 @@ fn quote_elem(elem: &Elem) -> Lit {
 }
 
 // parses all non-toplevel expressions
-impl Elem<'_> {
+impl Elem<String> {
     pub fn parse(self) -> AST {
         match self {
             Elem::String(str) => AST::Lit(Lit::String(str.into())),
@@ -22,76 +22,82 @@ impl Elem<'_> {
                     str.to_string()
                         .parse::<bool>()
                         .map(|bool| AST::Lit(Lit::Bool(bool)))
-                        .unwrap_or_else(|_| AST::Ident(str.into()))
+                        .unwrap_or_else(|_| AST::Ident(Ident(str)))
                 }),
             Elem::List(elems) => match elems.as_slice() {
-                [Elem::Symbol("list"), rest @ ..] => {
+                [Elem::Symbol(str), rest @ ..] if str == "list" => {
                     AST::List(rest.iter().map(|elem| elem.clone().parse()).collect())
                 }
-                [Elem::Symbol("cons"), elem, list] => AST::Cons(
+                [Elem::Symbol(str), elem, list] if str == "cons" => AST::Cons(
                     Box::new(elem.clone().parse()),
                     Box::new(list.clone().parse()),
                 ),
-                [Elem::Symbol("car"), list] => AST::Car(Box::new(list.clone().parse())),
-                [Elem::Symbol("cdr"), list] => AST::Cdr(Box::new(list.clone().parse())),
-                [Elem::Symbol("empty?"), list] => AST::Emptyp(Box::new(list.clone().parse())),
-                [Elem::Symbol("if"), cond_expr, then_expr, else_expr] => AST::Ite(
+                [Elem::Symbol(str), list] if str == "car" => {
+                    AST::Car(Box::new(list.clone().parse()))
+                }
+                [Elem::Symbol(str), list] if str == "cdr" => {
+                    AST::Cdr(Box::new(list.clone().parse()))
+                }
+                [Elem::Symbol(str), list] if str == "empty?" => {
+                    AST::Emptyp(Box::new(list.clone().parse()))
+                }
+                [Elem::Symbol(str), cond_expr, then_expr, else_expr] if str == "if" => AST::Ite(
                     Box::new(cond_expr.clone().parse()),
                     Box::new(then_expr.clone().parse()),
                     Box::new(else_expr.clone().parse()),
                 ),
-                [Elem::Symbol("=="), expr1, expr2] => AST::Eq(
+                [Elem::Symbol(str), expr1, expr2] if str == "==" => AST::Eq(
                     Box::new(expr1.clone().parse()),
                     Box::new(expr2.clone().parse()),
                 ),
-                [Elem::Symbol("<"), expr1, expr2] => AST::Lt(
+                [Elem::Symbol(str), expr1, expr2] if str == "<" => AST::Lt(
                     Box::new(expr1.clone().parse()),
                     Box::new(expr2.clone().parse()),
                 ),
-                [Elem::Symbol(">"), expr1, expr2] => AST::Gt(
+                [Elem::Symbol(str), expr1, expr2] if str == ">" => AST::Gt(
                     Box::new(expr1.clone().parse()),
                     Box::new(expr2.clone().parse()),
                 ),
-                [Elem::Symbol("&&"), expr1, expr2] => AST::And(
+                [Elem::Symbol(str), expr1, expr2] if str == "&&" => AST::And(
                     Box::new(expr1.clone().parse()),
                     Box::new(expr2.clone().parse()),
                 ),
-                [Elem::Symbol("||"), expr1, expr2] => AST::Or(
+                [Elem::Symbol(str), expr1, expr2] if str == "||" => AST::Or(
                     Box::new(expr1.clone().parse()),
                     Box::new(expr2.clone().parse()),
                 ),
-                [Elem::Symbol("quote"), rest] => AST::Quote(quote_elem(rest)),
-                [Elem::Symbol("let"), Elem::Symbol(ident), expr1, expr2] => AST::Let(
-                    (*ident).into(),
+                [Elem::Symbol(str), rest] if str == "quote" => AST::Quote(quote_elem(rest)),
+                [Elem::Symbol(str), Elem::Symbol(ident), expr1, expr2] if str == "let" => AST::Let(
+                    (*ident).as_str().into(),
                     Box::new(expr1.clone().parse()),
                     Box::new(expr2.clone().parse()),
                 ),
-                [Elem::Symbol("++"), str1, str2] => AST::Concat(
+                [Elem::Symbol(str), str1, str2] if str == "++" => AST::Concat(
                     Box::new(str1.clone().parse()),
                     Box::new(str2.clone().parse()),
                 ),
-                [Elem::Symbol("+"), num1, num2] => AST::Add(
+                [Elem::Symbol(str), num1, num2] if str == "+" => AST::Add(
                     Box::new(num1.clone().parse()),
                     Box::new(num2.clone().parse()),
                 ),
-                [Elem::Symbol("-"), num1, num2] => AST::Sub(
+                [Elem::Symbol(str), num1, num2] if str == "-" => AST::Sub(
                     Box::new(num1.clone().parse()),
                     Box::new(num2.clone().parse()),
                 ),
-                [Elem::Symbol("/"), num1, num2] => AST::Div(
+                [Elem::Symbol(str), num1, num2] if str == "/" => AST::Div(
                     Box::new(num1.clone().parse()),
                     Box::new(num2.clone().parse()),
                 ),
-                [Elem::Symbol("%"), num1, num2] => AST::Mod(
+                [Elem::Symbol(str), num1, num2] if str == "%" => AST::Mod(
                     Box::new(num1.clone().parse()),
                     Box::new(num2.clone().parse()),
                 ),
-                [Elem::Symbol("*"), num1, num2] => AST::Mult(
+                [Elem::Symbol(str), num1, num2] if str == "*" => AST::Mult(
                     Box::new(num1.clone().parse()),
                     Box::new(num2.clone().parse()),
                 ),
                 [Elem::Symbol(ident), rest @ ..] => AST::Call(
-                    (*ident).into(),
+                    (*ident).as_str().into(),
                     rest.iter().map(|elem| elem.to_owned().parse()).collect(),
                 ),
                 other => panic!("Unable to abstractify: {:#?}", other),
@@ -102,42 +108,53 @@ impl Elem<'_> {
     // parses all expressions, plus top-level declarations
     pub fn parse_toplevel(self) -> Toplevel {
         match self {
-            Elem::List(elems) => Toplevel(elems.iter().map(|elem| match elem {
-                Elem::List(toplevel_form) => match toplevel_form.as_slice() {
-                    [Elem::Symbol("fn"), Elem::Symbol(ident), Elem::List(args), body] =>
-                        AST::Func(
-                            (*ident).into(),
-                            args.iter()
-                                .map(|elem| match elem {
-                                    Elem::Symbol(str) => (*str).into(),
-                                    other => panic!(
+            Elem::List(elems) => Toplevel(
+                elems
+                    .iter()
+                    .map(|elem| match elem {
+                        Elem::List(toplevel_form) => match toplevel_form.as_slice() {
+                            [Elem::Symbol(str), Elem::Symbol(ident), Elem::List(args), body]
+                                if str == "fn" =>
+                            {
+                                AST::Func(
+                                    (*ident).as_str().into(),
+                                    args.iter()
+                                        .map(|elem| match elem {
+                                            Elem::Symbol(str) => (*str).as_str().into(),
+                                            other => panic!(
                                         "Only valid identifiers allowed in argument lists: {:?}",
                                         other
                                     ),
-                                })
-                                .collect::<Vec<Ident>>(),
-                            Box::new(body.to_owned().parse()),
-                        ),
-                    [Elem::Symbol("macro"), Elem::Symbol(ident), Elem::List(args), body] =>
-                        AST::Macro(
-                            (*ident).into(),
-                            args.iter()
-                                .map(|elem| match elem {
-                                    Elem::Symbol(str) => (*str).into(),
-                                    other => panic!(
+                                        })
+                                        .collect::<Vec<Ident>>(),
+                                    Box::new(body.to_owned().parse()),
+                                )
+                            }
+                            [Elem::Symbol(str), Elem::Symbol(ident), Elem::List(args), body]
+                                if str == "macro" =>
+                            {
+                                AST::Macro(
+                                    (*ident).as_str().into(),
+                                    args.iter()
+                                        .map(|elem| match elem {
+                                            Elem::Symbol(str) => (*str).as_str().into(),
+                                            other => panic!(
                                         "Only valid identifiers allowed in argument lists: {:?}",
                                         other
                                     ),
-                                })
-                                .collect::<Vec<Ident>>(),
-                            Box::new(body.to_owned().parse()),
-                        ),
-                    // defer to the AST impl to translate 'normal' exprs which
-                    // could appear at the top level
-                    _ => elem.to_owned().parse(),
-                },
-                _ => elem.to_owned().parse(),
-            }).collect::<Vec<AST>>()),
+                                        })
+                                        .collect::<Vec<Ident>>(),
+                                    Box::new(body.to_owned().parse()),
+                                )
+                            }
+                            // defer to the AST impl to translate 'normal' exprs which
+                            // could appear at the top level
+                            _ => elem.to_owned().parse(),
+                        },
+                        _ => panic!(),
+                    })
+                    .collect::<Vec<AST>>(),
+            ),
             // The top level wasn't passed a list of top-level forms, error!
             _ => panic!("Parsing into toplevel form failed: {:#?}", self),
         }
@@ -311,7 +328,7 @@ mod test {
     #[should_panic]
     #[allow(unused_must_use)]
     fn test_from_14() {
-        tokenize("(+ 1 1)").unwrap().parse_toplevel();
+        dbg!(tokenize("(+ 1 1)").unwrap().parse_toplevel());
     }
 
     #[test]

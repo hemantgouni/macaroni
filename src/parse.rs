@@ -30,7 +30,7 @@ fn string_char(char: u8) -> bool {
     char != b'"'
 }
 
-fn string(input: &[u8]) -> IResult<&[u8], Elem> {
+fn string(input: &[u8]) -> IResult<&[u8], Elem<&str>> {
     let (input, _) = tag("\"")(input)?;
     let (input, elem) = take_while1(string_char)(input)?;
     let (input, _) = tag("\"")(input)?;
@@ -47,7 +47,7 @@ fn string(input: &[u8]) -> IResult<&[u8], Elem> {
 }
 
 // result error type holds &[u8]s because that's what the input in the result holds
-fn symbol(input: &[u8]) -> IResult<&[u8], Elem> {
+fn symbol(input: &[u8]) -> IResult<&[u8], Elem<&str>> {
     let (input, elem) = take_while1(symbol_char)(input)?;
     let (input, _) = take_while(skip_char)(input)?;
 
@@ -62,7 +62,7 @@ fn symbol(input: &[u8]) -> IResult<&[u8], Elem> {
     Ok((input, Elem::Symbol(result)))
 }
 
-fn list(input: &[u8]) -> IResult<&[u8], Elem> {
+fn list(input: &[u8]) -> IResult<&[u8], Elem<&str>> {
     let (input, _) = take_while(skip_char)(input)?;
     let (input, _) = paren_left(input)?;
     let (input, _) = take_while(skip_char)(input)?;
@@ -72,9 +72,9 @@ fn list(input: &[u8]) -> IResult<&[u8], Elem> {
     Ok((input, Elem::List(symbols)))
 }
 
-pub fn tokenize(input: &str) -> Result<Elem, String> {
+pub fn tokenize(input: &str) -> Result<Elem<String>, String> {
     list(input.as_bytes())
-        .map(|(_, elem)| elem)
+        .map(|(_, elem)| elem.map(|str: &str| str.to_string()))
         .map_err(|err| match err {
             nom::Err::Error(Error { input, code: _ }) => std::str::from_utf8(input)
                 .map(|str| str.to_string())
@@ -109,7 +109,7 @@ mod test {
             res,
             Ok((
                 "".as_bytes(),
-                Elem::List(vec!["a", "b"].iter().map(|str| Elem::Symbol(str)).collect())
+                Elem::List(vec!["a", "b"].iter().map(|str| Elem::Symbol(*str)).collect())
             ))
         )
     }
@@ -117,10 +117,10 @@ mod test {
     #[test]
     fn test_list_3() {
         let res = list(b"(a b (a b c d e))");
-        let mut vec1: Vec<Elem> = vec!["a", "b"].iter().map(|str| Elem::Symbol(str)).collect();
-        let vec2: Vec<Elem> = vec!["a", "b", "c", "d", "e"]
+        let mut vec1: Vec<Elem<&str>> = vec!["a", "b"].iter().map(|str| Elem::Symbol(*str)).collect();
+        let vec2: Vec<Elem<&str>> = vec!["a", "b", "c", "d", "e"]
             .iter()
-            .map(|str| Elem::Symbol(str))
+            .map(|str| Elem::Symbol(*str))
             .collect();
         vec1.push(Elem::List(vec2));
         assert_eq!(res, Ok(("".as_bytes(), Elem::List(vec1))))
@@ -129,10 +129,10 @@ mod test {
     #[test]
     fn test_list_4() {
         let res = list(b" (a b (a b c d e))");
-        let mut vec1: Vec<Elem> = vec!["a", "b"].iter().map(|str| Elem::Symbol(str)).collect();
-        let vec2: Vec<Elem> = vec!["a", "b", "c", "d", "e"]
+        let mut vec1: Vec<Elem<&str>> = vec!["a", "b"].iter().map(|str| Elem::Symbol(*str)).collect();
+        let vec2: Vec<Elem<&str>> = vec!["a", "b", "c", "d", "e"]
             .iter()
-            .map(|str| Elem::Symbol(str))
+            .map(|str| Elem::Symbol(*str))
             .collect();
         vec1.push(Elem::List(vec2));
         assert_eq!(res, Ok(("".as_bytes(), Elem::List(vec1))))
@@ -141,10 +141,10 @@ mod test {
     #[test]
     fn test_list_5() {
         let res = list(b"(a b (a b c d e)) ");
-        let mut vec1: Vec<Elem> = vec!["a", "b"].iter().map(|str| Elem::Symbol(str)).collect();
-        let vec2: Vec<Elem> = vec!["a", "b", "c", "d", "e"]
+        let mut vec1: Vec<Elem<&str>> = vec!["a", "b"].iter().map(|str| Elem::Symbol(*str)).collect();
+        let vec2: Vec<Elem<&str>> = vec!["a", "b", "c", "d", "e"]
             .iter()
-            .map(|str| Elem::Symbol(str))
+            .map(|str| Elem::Symbol(*str))
             .collect();
         vec1.push(Elem::List(vec2));
         assert_eq!(res, Ok(("".as_bytes(), Elem::List(vec1))))
@@ -153,10 +153,10 @@ mod test {
     #[test]
     fn test_list_7() {
         let res = list(b"                                   (   a   b     (    a b c d e) ) ");
-        let mut vec1: Vec<Elem> = vec!["a", "b"].iter().map(|str| Elem::Symbol(str)).collect();
-        let vec2: Vec<Elem> = vec!["a", "b", "c", "d", "e"]
+        let mut vec1: Vec<Elem<&str>> = vec!["a", "b"].iter().map(|str| Elem::Symbol(*str)).collect();
+        let vec2: Vec<Elem<&str>> = vec!["a", "b", "c", "d", "e"]
             .iter()
-            .map(|str| Elem::Symbol(str))
+            .map(|str| Elem::Symbol(*str))
             .collect();
         vec1.push(Elem::List(vec2));
         assert_eq!(res, Ok(("".as_bytes(), Elem::List(vec1))))
@@ -169,7 +169,7 @@ mod test {
             (fn hello-world
              (println Hello world))",
         );
-        let target: Result<(&[u8], Elem), nom::Err<Error<&[u8]>>> = Ok((
+        let target: Result<(&[u8], Elem<&str>), nom::Err<Error<&[u8]>>> = Ok((
             &[],
             Elem::List(vec![
                 Elem::Symbol("fn"),
@@ -191,7 +191,7 @@ mod test {
             (fn hello-world
              (println \"hey, world!\"))",
         );
-        let target: Result<(&[u8], Elem), nom::Err<Error<&[u8]>>> = Ok((
+        let target: Result<(&[u8], Elem<&str>), nom::Err<Error<&[u8]>>> = Ok((
             &[],
             Elem::List(vec![
                 Elem::Symbol("fn"),
@@ -209,7 +209,7 @@ mod test {
             (fn hello-world
              (println! \"hey, world!\"))",
         );
-        let target: Result<(&[u8], Elem), nom::Err<Error<&[u8]>>> = Ok((
+        let target: Result<(&[u8], Elem<&str>), nom::Err<Error<&[u8]>>> = Ok((
             &[],
             Elem::List(vec![
                 Elem::Symbol("fn"),
@@ -223,7 +223,7 @@ mod test {
     #[test]
     fn test_list_12() {
         let res = list(br#"((++ "hey " "there"))"#);
-        let target: Result<(&[u8], Elem), nom::Err<Error<&[u8]>>> = Ok((
+        let target: Result<(&[u8], Elem<&str>), nom::Err<Error<&[u8]>>> = Ok((
             &[],
             Elem::List(vec![Elem::List(vec![
                 Elem::Symbol("++"),

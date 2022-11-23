@@ -1,8 +1,18 @@
 #[derive(Debug, Eq, PartialEq, Clone)]
-pub enum Elem<'a> {
-    String(&'a str),
-    Symbol(&'a str),
-    List(Vec<Elem<'a>>),
+pub enum Elem<A> {
+    String(A),
+    Symbol(A),
+    List(Vec<Elem<A>>),
+}
+
+impl<A: Clone> Elem<A> {
+    pub fn map<B>(&self, func: fn(A) -> B) -> Elem<B> {
+        match self {
+            Elem::String(str) => Elem::String(func((*str).to_owned())),
+            Elem::Symbol(str) => Elem::Symbol(func((*str).to_owned())),
+            Elem::List(elems) => Elem::List(elems.iter().map(|elem| elem.map(func)).collect()),
+        }
+    }
 }
 
 #[derive(Debug, Eq, PartialEq, Clone)]
@@ -16,10 +26,7 @@ impl From<&str> for Ident {
         match str {
             "%" | "&&" | "*" | "+" | "++" | "-" | "/" | "<" | "==" | ">" | "||" | "car" | "cdr"
             | "cons" | "empty?" | "fn" | "if" | "let" | "list" | "macro" | "quote" | "unquote" => {
-                panic!(
-                    "Special form used incorrectly: {}",
-                    str
-                )
+                panic!("Special form used incorrectly: {}", str)
             }
             _ => Ident(str.into()),
         }
