@@ -182,7 +182,7 @@ mod test {
 
     #[test]
     fn test_from_4() {
-        let res: AST = parse("(quote a b c d e (+ 1 1))").unwrap().into();
+        let res: AST = parse("(quote (a b c d e (+ 1 1)))").unwrap().into();
         let target: AST = AST::Quote(Box::new(AST::Lit(Lit::List(vec![
             Lit::Symbol("a".into()),
             Lit::Symbol("b".into()),
