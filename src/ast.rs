@@ -151,7 +151,7 @@ impl Elem<String> {
                             // could appear at the top level
                             _ => elem.to_owned().parse(),
                         },
-                        _ => panic!(),
+                        _ => panic!("No list of top-level forms provided!"),
                     })
                     .collect::<Vec<AST>>(),
             ),
