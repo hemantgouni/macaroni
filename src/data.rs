@@ -5,11 +5,11 @@ pub enum Elem<A> {
     List(Vec<Elem<A>>),
 }
 
-impl<A: Clone> Elem<A> {
-    pub fn map<B>(&self, func: fn(A) -> B) -> Elem<B> {
+impl<A> Elem<A> {
+    pub fn map<B>(&self, func: &impl Fn(&A) -> B) -> Elem<B> {
         match self {
-            Elem::String(str) => Elem::String(func((*str).to_owned())),
-            Elem::Symbol(str) => Elem::Symbol(func((*str).to_owned())),
+            Elem::String(str) => Elem::String(func(str)),
+            Elem::Symbol(str) => Elem::Symbol(func(str)),
             Elem::List(elems) => Elem::List(elems.iter().map(|elem| elem.map(func)).collect()),
         }
     }
@@ -39,7 +39,21 @@ pub enum Lit {
     Bool(bool),
     String(String),
     Symbol(String),
+    Quote(Box<Lit>),
     List(Vec<Lit>),
+}
+
+impl Lit {
+    pub fn to_elem(&self) -> Elem<String> {
+        match self {
+            Lit::I64(num) => Elem::Symbol(num.to_string()),
+            Lit::Bool(bool) => Elem::Symbol(bool.to_string()),
+            Lit::String(string) => Elem::String(string.to_string()),
+            Lit::Symbol(string) => Elem::Symbol(string.to_string()),
+            Lit::Quote(lit) => lit.to_elem(),
+            Lit::List(lits) => Elem::List(lits.iter().map(|lit| lit.to_elem()).collect()),
+        }
+    }
 }
 
 #[derive(Debug, Eq, PartialEq, Clone)]
@@ -50,7 +64,7 @@ pub enum AST {
     Lit(Lit),
     Ident(Ident),
     // consider a different abstractification procedure for when we're in quote
-    Quote(Lit),
+    Eval(Box<AST>),
     List(Vec<AST>),
     Cons(Box<AST>, Box<AST>),
     Car(Box<AST>),

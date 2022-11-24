@@ -100,6 +100,7 @@ fn evaluate_expr(program: AST, mut environment: Env) -> Result<Lit, String> {
             _ => Err("Attempted to multiply two non-numbers!".into()),
         },
         AST::Lit(lit) => match lit {
+            // TODO: remove the match here!
             _ => Ok(lit),
         },
         AST::List(elems) => Ok(Lit::List(elems.iter().fold(
@@ -215,7 +216,9 @@ fn evaluate_expr(program: AST, mut environment: Env) -> Result<Lit, String> {
         AST::Ident(ident) => environment
             .lookup(&ident)
             .map(|expr| evaluate_expr(expr, environment))?,
-        AST::Quote(lit) => Ok(lit),
+        AST::Eval(expr) => match evaluate_expr(*expr, environment.to_owned())? {
+            prog => evaluate_expr(prog.to_elem().parse(), environment.to_owned()),
+        },
         _ => Err(format!("Unable to evaluate the tree {:?}", program)),
     }
 }
@@ -227,7 +230,8 @@ mod test {
 
     #[test]
     fn test_evaluate_1() {
-        let res: Lit = evaluate(tokenize("((+ (+ 1 1) (- 1 1)))").unwrap().parse_toplevel()).unwrap();
+        let res: Lit =
+            evaluate(tokenize("((+ (+ 1 1) (- 1 1)))").unwrap().parse_toplevel()).unwrap();
         let target: Lit = Lit::I64(2);
 
         assert_eq!(res, target);
@@ -235,7 +239,12 @@ mod test {
 
     #[test]
     fn test_evaluate_2() {
-        let res: Lit = evaluate(tokenize("((let a 4 (+ (+ 1 1) (+ 1 a))))").unwrap().parse_toplevel()).unwrap();
+        let res: Lit = evaluate(
+            tokenize("((let a 4 (+ (+ 1 1) (+ 1 a))))")
+                .unwrap()
+                .parse_toplevel(),
+        )
+        .unwrap();
         let target: Lit = Lit::I64(7);
 
         assert_eq!(res, target);
@@ -300,7 +309,12 @@ mod test {
 
     #[test]
     fn test_evaluate_or_2() {
-        let res: Lit = evaluate(tokenize("((|| (== 1 1) (== true false)))").unwrap().parse_toplevel()).unwrap();
+        let res: Lit = evaluate(
+            tokenize("((|| (== 1 1) (== true false)))")
+                .unwrap()
+                .parse_toplevel(),
+        )
+        .unwrap();
         let target: Lit = Lit::Bool(true);
 
         assert_eq!(res, target);
@@ -308,7 +322,12 @@ mod test {
 
     #[test]
     fn test_evaluate_concat() {
-        let res: Lit = evaluate(tokenize(r#"((++ "hey " "there")))"#).unwrap().parse_toplevel()).unwrap();
+        let res: Lit = evaluate(
+            tokenize(r#"((++ "hey " "there")))"#)
+                .unwrap()
+                .parse_toplevel(),
+        )
+        .unwrap();
         let target: Lit = Lit::String("hey there".to_string());
 
         assert_eq!(res, target);
@@ -316,7 +335,12 @@ mod test {
 
     #[test]
     fn test_litlist_1() {
-        let res: Lit = evaluate(tokenize(r#"((list 4 4 4 7 7 7 7))"#).unwrap().parse_toplevel()).unwrap();
+        let res: Lit = evaluate(
+            tokenize(r#"((list 4 4 4 7 7 7 7))"#)
+                .unwrap()
+                .parse_toplevel(),
+        )
+        .unwrap();
         let target: Lit = Lit::List(vec![
             Lit::I64(4),
             Lit::I64(4),
@@ -353,7 +377,12 @@ mod test {
 
     #[test]
     fn test_car() {
-        let res: Lit = evaluate(tokenize(r#"((car (list 4 4 4 7 7 7 7)))"#).unwrap().parse_toplevel()).unwrap();
+        let res: Lit = evaluate(
+            tokenize(r#"((car (list 4 4 4 7 7 7 7)))"#)
+                .unwrap()
+                .parse_toplevel(),
+        )
+        .unwrap();
         let target: Lit = Lit::I64(4);
 
         assert_eq!(res, target);
@@ -361,8 +390,12 @@ mod test {
 
     #[test]
     fn test_cdr() {
-        let res: Lit =
-            evaluate(tokenize(r#"((cdr (list 4 4 4 4 7 7 7 7)))"#).unwrap().parse_toplevel()).unwrap();
+        let res: Lit = evaluate(
+            tokenize(r#"((cdr (list 4 4 4 4 7 7 7 7)))"#)
+                .unwrap()
+                .parse_toplevel(),
+        )
+        .unwrap();
         let target: Lit = Lit::List(vec![
             Lit::I64(4),
             Lit::I64(4),
@@ -378,8 +411,12 @@ mod test {
 
     #[test]
     fn test_cons() {
-        let res: Lit =
-            evaluate(tokenize(r#"((cons 4 (list 4 4 4 7 7 7 7)))"#).unwrap().parse_toplevel()).unwrap();
+        let res: Lit = evaluate(
+            tokenize(r#"((cons 4 (list 4 4 4 7 7 7 7)))"#)
+                .unwrap()
+                .parse_toplevel(),
+        )
+        .unwrap();
         let target: Lit = Lit::List(vec![
             Lit::I64(4),
             Lit::I64(4),
@@ -607,6 +644,112 @@ mod test {
             Lit::I64(11),
             Lit::I64(11),
         ]);
+
+        assert_eq!(res, target);
+    }
+
+    #[test]
+    fn test_quote_1() {
+        let res: Lit = evaluate(
+            tokenize(
+                r#"
+                ((quote (+ 1 1)))
+                "#,
+            )
+            .unwrap()
+            .parse_toplevel(),
+        )
+        .unwrap();
+
+        let target: Lit = Lit::List(vec![
+            Lit::Quote(Box::new(Lit::Symbol("+".to_string()))),
+            Lit::Quote(Box::new(Lit::Symbol("1".to_string()))),
+            Lit::Quote(Box::new(Lit::Symbol("1".to_string()))),
+        ]);
+
+        assert_eq!(res, target);
+    }
+
+    #[test]
+    fn test_quote_2() {
+        let res: Lit = evaluate(
+            tokenize(
+                r#"
+                ((cons (quote hey) (quote (a b (c "hey" e) f g h))))
+                "#,
+            )
+            .unwrap()
+            .parse_toplevel(),
+        )
+        .unwrap();
+
+        let target: Lit = Lit::List(vec![
+            Lit::Quote(Box::new(Lit::Symbol("hey".to_string()))),
+            Lit::Quote(Box::new(Lit::Symbol("a".to_string()))),
+            Lit::Quote(Box::new(Lit::Symbol("b".to_string()))),
+            Lit::List(vec![
+                Lit::Quote(Box::new(Lit::Symbol("c".to_string()))),
+                Lit::Quote(Box::new(Lit::String("hey".to_string()))),
+                Lit::Quote(Box::new(Lit::Symbol("e".to_string()))),
+            ]),
+            Lit::Quote(Box::new(Lit::Symbol("f".to_string()))),
+            Lit::Quote(Box::new(Lit::Symbol("g".to_string()))),
+            Lit::Quote(Box::new(Lit::Symbol("h".to_string()))),
+        ]);
+
+        assert_eq!(res, target);
+    }
+
+    #[test]
+    fn test_quote_4() {
+        let res: Lit = evaluate(
+            tokenize(
+                r#"
+                ((eval (quote (+ 1 1))))
+                "#,
+            )
+            .unwrap()
+            .parse_toplevel(),
+        )
+        .unwrap();
+
+        let target: Lit = Lit::I64(2);
+
+        assert_eq!(res, target);
+    }
+
+    #[test]
+    fn test_eval_1() {
+        let res: Lit = evaluate(
+            tokenize(
+                r#"
+                ((eval 1)))
+                "#,
+            )
+            .unwrap()
+            .parse_toplevel(),
+        )
+        .unwrap();
+
+        let target: Lit = Lit::I64(1);
+
+        assert_eq!(res, target);
+    }
+
+    #[test]
+    fn test_eval_2() {
+        let res: Lit = evaluate(
+            tokenize(
+                r#"
+                ((eval (eval 1)))
+                "#,
+            )
+            .unwrap()
+            .parse_toplevel(),
+        )
+        .unwrap();
+
+        let target: Lit = Lit::I64(1);
 
         assert_eq!(res, target);
     }

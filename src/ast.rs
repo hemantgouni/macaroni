@@ -3,8 +3,8 @@ use crate::data::{Elem, Ident, Lit, Toplevel, AST};
 fn quote_elem(elem: &Elem<String>) -> Lit {
     // Hey, this is basically the lexed representation of the code!!!!
     match elem {
-        Elem::String(str) => Lit::String(str.to_string()),
-        Elem::Symbol(str) => Lit::Symbol(str.to_string()),
+        Elem::String(str) => Lit::Quote(Box::new(Lit::String(str.to_string()))),
+        Elem::Symbol(str) => Lit::Quote(Box::new(Lit::Symbol(str.to_string()))),
         Elem::List(elems) => Lit::List(elems.iter().map(|elem| quote_elem(elem)).collect()),
     }
 }
@@ -66,7 +66,10 @@ impl Elem<String> {
                     Box::new(expr1.clone().parse()),
                     Box::new(expr2.clone().parse()),
                 ),
-                [Elem::Symbol(str), rest] if str == "quote" => AST::Quote(quote_elem(rest)),
+                [Elem::Symbol(str), body] if str == "quote" => AST::Lit(quote_elem(body)),
+                [Elem::Symbol(str), body] if str == "eval" => {
+                    AST::Eval(Box::new(body.clone().parse()))
+                }
                 [Elem::Symbol(str), Elem::Symbol(ident), expr1, expr2] if str == "let" => AST::Let(
                     (*ident).as_str().into(),
                     Box::new(expr1.clone().parse()),
@@ -205,16 +208,16 @@ mod test {
     #[test]
     fn test_from_4() {
         let res: AST = tokenize("(quote (a b c d e (+ 1 1)))").unwrap().parse();
-        let target: AST = AST::Quote(Lit::List(vec![
-            Lit::Symbol("a".into()),
-            Lit::Symbol("b".into()),
-            Lit::Symbol("c".into()),
-            Lit::Symbol("d".into()),
-            Lit::Symbol("e".into()),
+        let target: AST = AST::Lit(Lit::List(vec![
+            Lit::Quote(Box::new(Lit::Symbol("a".into()))),
+            Lit::Quote(Box::new(Lit::Symbol("b".into()))),
+            Lit::Quote(Box::new(Lit::Symbol("c".into()))),
+            Lit::Quote(Box::new(Lit::Symbol("d".into()))),
+            Lit::Quote(Box::new(Lit::Symbol("e".into()))),
             Lit::List(vec![
-                Lit::Symbol("+".into()),
-                Lit::Symbol("1".into()),
-                Lit::Symbol("1".into()),
+                Lit::Quote(Box::new(Lit::Symbol("+".into()))),
+                Lit::Quote(Box::new(Lit::Symbol("1".into()))),
+                Lit::Quote(Box::new(Lit::Symbol("1".into()))),
             ]),
         ]));
         assert_eq!(res, target)
@@ -367,6 +370,11 @@ mod test {
         ]);
         assert_eq!(res, target);
     }
+
+    // #[test]
+    // fn test_parse_17() {
+    //     let res: Toplevel = tokenize
+    // }
 
     #[test]
     #[allow(unused_must_use)]

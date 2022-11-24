@@ -74,7 +74,7 @@ fn list(input: &[u8]) -> IResult<&[u8], Elem<&str>> {
 
 pub fn tokenize(input: &str) -> Result<Elem<String>, String> {
     list(input.as_bytes())
-        .map(|(_, elem)| elem.map(|str: &str| str.to_string()))
+        .map(|(_, elem)| elem.map(&|str| str.to_string()))
         .map_err(|err| match err {
             nom::Err::Error(Error { input, code: _ }) => std::str::from_utf8(input)
                 .map(|str| str.to_string())
