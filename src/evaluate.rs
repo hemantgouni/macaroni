@@ -41,7 +41,7 @@ fn evaluate_top(forms: Vec<AST>, mut environment: Env) -> Result<Lit, String> {
         ),
         // this stops registering functions at the first non-decl form
         [expr, ..] => evaluate_expr(expr.clone(), environment),
-        [] => panic!("No top-level forms or evaluable expressions provided!"),
+        [] => Err("No top-level forms or evaluable expressions provided!".into()),
     }
 }
 
@@ -62,7 +62,7 @@ fn evaluate_expr(program: AST, mut environment: Env) -> Result<Lit, String> {
                     });
                 evaluate_expr(*body, environment?)
             }
-            _ => panic!("Could not find function {:?}", ident),
+            _ => Err(format!("Could not find function {:?}", ident)),
         },
         AST::Add(num1, num2) => match (
             evaluate_expr(*num1, environment.to_owned())?,
@@ -99,10 +99,7 @@ fn evaluate_expr(program: AST, mut environment: Env) -> Result<Lit, String> {
             (Lit::I64(num1), Lit::I64(num2)) => Ok(Lit::I64(num1 * num2)),
             _ => Err("Attempted to multiply two non-numbers!".into()),
         },
-        AST::Lit(lit) => match lit {
-            // TODO: remove the match here!
-            _ => Ok(lit),
-        },
+        AST::Lit(lit) => Ok(lit),
         AST::List(elems) => Ok(Lit::List(elems.iter().fold(
             Ok(Vec::new()),
             |results: Result<Vec<Lit>, String>, elem| {
@@ -163,10 +160,10 @@ fn evaluate_expr(program: AST, mut environment: Env) -> Result<Lit, String> {
                         evaluate_expr(*else_expr, environment.to_owned())
                     }
                 }
-                _ => panic!(
+                _ => Err(format!(
                     "Non-boolean expression encountered as conditional guard: {:?}",
                     cond_expr
-                ),
+                )),
             }
         }
         AST::Eq(expr1, expr2) => match (
@@ -176,49 +173,50 @@ fn evaluate_expr(program: AST, mut environment: Env) -> Result<Lit, String> {
             (Lit::I64(num1), Lit::I64(num2)) => Ok(Lit::Bool(num1 == num2)),
             (Lit::Bool(bool1), Lit::Bool(bool2)) => Ok(Lit::Bool(bool1 == bool2)),
             (Lit::String(str1), Lit::String(str2)) => Ok(Lit::Bool(str1 == str2)),
-            other => panic!("Differing types given to ==: {:?}", other),
+            other => Err(format!("Differing types given to ==: {:?}", other)),
         },
         AST::Lt(expr1, expr2) => match (
             evaluate_expr(*expr1, environment.to_owned())?,
             evaluate_expr(*expr2, environment.to_owned())?,
         ) {
             (Lit::I64(num1), Lit::I64(num2)) => Ok(Lit::Bool(num1 < num2)),
-            other => panic!("Non-numeric argument(s) given to <: {:?}", other),
+            other => Err(format!("Non-numeric argument(s) given to <: {:?}", other)),
         },
         AST::Gt(expr1, expr2) => match (
             evaluate_expr(*expr1, environment.to_owned())?,
             evaluate_expr(*expr2, environment.to_owned())?,
         ) {
             (Lit::I64(num1), Lit::I64(num2)) => Ok(Lit::Bool(num1 > num2)),
-            other => panic!("Non-numeric argument(s) given to >: {:?}", other),
+            other => Err(format!("Non-numeric argument(s) given to >: {:?}", other)),
         },
         AST::And(expr1, expr2) => match (
             evaluate_expr(*expr1, environment.to_owned())?,
             evaluate_expr(*expr2, environment.to_owned())?,
         ) {
             (Lit::Bool(bool1), Lit::Bool(bool2)) => Ok(Lit::Bool(bool1 && bool2)),
-            other => panic!("Non-boolean arguments received for &&: {:?}", other),
+            other => Err(format!("Non-boolean arguments received for &&: {:?}", other)),
         },
         AST::Or(expr1, expr2) => match (
             evaluate_expr(*expr1, environment.to_owned())?,
             evaluate_expr(*expr2, environment.to_owned())?,
         ) {
             (Lit::Bool(bool1), Lit::Bool(bool2)) => Ok(Lit::Bool(bool1 || bool2)),
-            other => panic!("Non-boolean arguments received for ||: {:?}", other),
+            other => Err(format!("Non-boolean arguments received for ||: {:?}", other)),
         },
         AST::Concat(expr1, expr2) => match (
             evaluate_expr(*expr1, environment.to_owned())?,
             evaluate_expr(*expr2, environment.to_owned())?,
         ) {
             (Lit::String(str1), Lit::String(str2)) => Ok(Lit::String(str1 + &str2)),
-            other => panic!("Non-string arguments given to ++: {:?}", other),
+            other => Err(format!("Non-string arguments given to ++: {:?}", other)),
         },
         AST::Ident(ident) => environment
             .lookup(&ident)
             .map(|expr| evaluate_expr(expr, environment))?,
-        AST::Eval(expr) => match evaluate_expr(*expr, environment.to_owned())? {
-            prog => evaluate_expr(prog.to_elem().parse(), environment.to_owned()),
-        },
+        AST::Eval(expr) => {
+            let prog = evaluate_expr(*expr, environment.to_owned())?;
+            evaluate_expr(prog.to_elem().parse(), environment.to_owned())
+        }
         _ => Err(format!("Unable to evaluate the tree {:?}", program)),
     }
 }
@@ -662,9 +660,9 @@ mod test {
         .unwrap();
 
         let target: Lit = Lit::List(vec![
-            Lit::Quote(Box::new(Lit::Symbol("+".to_string()))),
-            Lit::Quote(Box::new(Lit::Symbol("1".to_string()))),
-            Lit::Quote(Box::new(Lit::Symbol("1".to_string()))),
+            Lit::Symbol("+".to_string()),
+            Lit::Symbol("1".to_string()),
+            Lit::Symbol("1".to_string()),
         ]);
 
         assert_eq!(res, target);
@@ -684,17 +682,17 @@ mod test {
         .unwrap();
 
         let target: Lit = Lit::List(vec![
-            Lit::Quote(Box::new(Lit::Symbol("hey".to_string()))),
-            Lit::Quote(Box::new(Lit::Symbol("a".to_string()))),
-            Lit::Quote(Box::new(Lit::Symbol("b".to_string()))),
+            Lit::Symbol("hey".to_string()),
+            Lit::Symbol("a".to_string()),
+            Lit::Symbol("b".to_string()),
             Lit::List(vec![
-                Lit::Quote(Box::new(Lit::Symbol("c".to_string()))),
-                Lit::Quote(Box::new(Lit::String("hey".to_string()))),
-                Lit::Quote(Box::new(Lit::Symbol("e".to_string()))),
+                Lit::Symbol("c".to_string()),
+                Lit::String("hey".to_string()),
+                Lit::Symbol("e".to_string()),
             ]),
-            Lit::Quote(Box::new(Lit::Symbol("f".to_string()))),
-            Lit::Quote(Box::new(Lit::Symbol("g".to_string()))),
-            Lit::Quote(Box::new(Lit::Symbol("h".to_string()))),
+            Lit::Symbol("f".to_string()),
+            Lit::Symbol("g".to_string()),
+            Lit::Symbol("h".to_string()),
         ]);
 
         assert_eq!(res, target);
@@ -750,6 +748,25 @@ mod test {
         .unwrap();
 
         let target: Lit = Lit::I64(1);
+
+        assert_eq!(res, target);
+    }
+
+    #[test]
+    fn test_eval_4() {
+        let res: Lit = evaluate(
+            tokenize(
+                r#"
+                ((fn gen-quoted-list () (quote (1 1)))
+                 (eval (cons (quote +) (gen-quoted-list))))
+                "#,
+            )
+            .unwrap()
+            .parse_toplevel(),
+        )
+        .unwrap();
+
+        let target: Lit = Lit::I64(2);
 
         assert_eq!(res, target);
     }

@@ -39,7 +39,6 @@ pub enum Lit {
     Bool(bool),
     String(String),
     Symbol(String),
-    Quote(Box<Lit>),
     List(Vec<Lit>),
 }
 
@@ -50,7 +49,6 @@ impl Lit {
             Lit::Bool(bool) => Elem::Symbol(bool.to_string()),
             Lit::String(string) => Elem::String(string.to_string()),
             Lit::Symbol(string) => Elem::Symbol(string.to_string()),
-            Lit::Quote(lit) => lit.to_elem(),
             Lit::List(lits) => Elem::List(lits.iter().map(|lit| lit.to_elem()).collect()),
         }
     }
