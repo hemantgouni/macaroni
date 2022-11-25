@@ -1,2 +1,0 @@
-((fn gen-quoted-list () (quote (4 4)))
- (eval (cons (quote *) (gen-quoted-list))))

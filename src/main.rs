@@ -17,7 +17,7 @@ use crate::data::Toplevel;
 fn main() -> io::Result<()> {
     let args: Vec<String> = env::args().collect();
 
-    let contents = fs::read_to_string(args.get(1).unwrap_or(&String::from("input.txt")))
+    let contents = fs::read_to_string(args.get(1).unwrap_or(&String::from("input.lisp")))
         .expect("No such file or directory!");
 
     let ast: Toplevel = parse::tokenize(&contents).unwrap().parse_toplevel();

@@ -194,14 +194,20 @@ fn evaluate_expr(program: AST, mut environment: Env) -> Result<Lit, String> {
             evaluate_expr(*expr2, environment.to_owned())?,
         ) {
             (Lit::Bool(bool1), Lit::Bool(bool2)) => Ok(Lit::Bool(bool1 && bool2)),
-            other => Err(format!("Non-boolean arguments received for &&: {:?}", other)),
+            other => Err(format!(
+                "Non-boolean arguments received for &&: {:?}",
+                other
+            )),
         },
         AST::Or(expr1, expr2) => match (
             evaluate_expr(*expr1, environment.to_owned())?,
             evaluate_expr(*expr2, environment.to_owned())?,
         ) {
             (Lit::Bool(bool1), Lit::Bool(bool2)) => Ok(Lit::Bool(bool1 || bool2)),
-            other => Err(format!("Non-boolean arguments received for ||: {:?}", other)),
+            other => Err(format!(
+                "Non-boolean arguments received for ||: {:?}",
+                other
+            )),
         },
         AST::Concat(expr1, expr2) => match (
             evaluate_expr(*expr1, environment.to_owned())?,
@@ -769,5 +775,48 @@ mod test {
         let target: Lit = Lit::I64(2);
 
         assert_eq!(res, target);
+    }
+
+    #[test]
+    fn test_eval_5() {
+        let res: Lit = evaluate(
+            tokenize(
+                r#"
+                ((fn return-two-numbers ()
+                     (quote (4 4)))
+                 (eval
+                   (cons (quote *) (cons (quote 4) (list (cons (quote *) (return-two-numbers)))))))
+                "#,
+            )
+            .unwrap()
+            .parse_toplevel(),
+        )
+        .unwrap();
+
+        let target: Lit = Lit::I64(64);
+
+        assert_eq!(res, target);
+    }
+
+    #[test]
+    #[should_panic]
+    fn test_eval_7() {
+        evaluate(
+            tokenize(
+                r#"
+                ((fn return-two-numbers ()
+                     (quote (4 4)))
+                 (eval
+                   (cons (quote *) (cons (quote 4) (cons (quote *) (return-two-numbers))))))
+                "#,
+            )
+            .unwrap()
+            .parse_toplevel(),
+        )
+        .unwrap();
+
+        // let target: Result<Lit, String> = Err("Special form used incorrectly: *".to_string());
+
+        // assert_eq!(res, target);
     }
 }
