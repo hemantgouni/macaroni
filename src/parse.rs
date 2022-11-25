@@ -109,7 +109,12 @@ mod test {
             res,
             Ok((
                 "".as_bytes(),
-                Elem::List(vec!["a", "b"].iter().map(|str| Elem::Symbol(*str)).collect())
+                Elem::List(
+                    vec!["a", "b"]
+                        .iter()
+                        .map(|str| Elem::Symbol(*str))
+                        .collect()
+                )
             ))
         )
     }
@@ -117,7 +122,10 @@ mod test {
     #[test]
     fn test_list_3() {
         let res = list(b"(a b (a b c d e))");
-        let mut vec1: Vec<Elem<&str>> = vec!["a", "b"].iter().map(|str| Elem::Symbol(*str)).collect();
+        let mut vec1: Vec<Elem<&str>> = vec!["a", "b"]
+            .iter()
+            .map(|str| Elem::Symbol(*str))
+            .collect();
         let vec2: Vec<Elem<&str>> = vec!["a", "b", "c", "d", "e"]
             .iter()
             .map(|str| Elem::Symbol(*str))
@@ -129,7 +137,10 @@ mod test {
     #[test]
     fn test_list_4() {
         let res = list(b" (a b (a b c d e))");
-        let mut vec1: Vec<Elem<&str>> = vec!["a", "b"].iter().map(|str| Elem::Symbol(*str)).collect();
+        let mut vec1: Vec<Elem<&str>> = vec!["a", "b"]
+            .iter()
+            .map(|str| Elem::Symbol(*str))
+            .collect();
         let vec2: Vec<Elem<&str>> = vec!["a", "b", "c", "d", "e"]
             .iter()
             .map(|str| Elem::Symbol(*str))
@@ -141,7 +152,10 @@ mod test {
     #[test]
     fn test_list_5() {
         let res = list(b"(a b (a b c d e)) ");
-        let mut vec1: Vec<Elem<&str>> = vec!["a", "b"].iter().map(|str| Elem::Symbol(*str)).collect();
+        let mut vec1: Vec<Elem<&str>> = vec!["a", "b"]
+            .iter()
+            .map(|str| Elem::Symbol(*str))
+            .collect();
         let vec2: Vec<Elem<&str>> = vec!["a", "b", "c", "d", "e"]
             .iter()
             .map(|str| Elem::Symbol(*str))
@@ -153,7 +167,10 @@ mod test {
     #[test]
     fn test_list_7() {
         let res = list(b"                                   (   a   b     (    a b c d e) ) ");
-        let mut vec1: Vec<Elem<&str>> = vec!["a", "b"].iter().map(|str| Elem::Symbol(*str)).collect();
+        let mut vec1: Vec<Elem<&str>> = vec!["a", "b"]
+            .iter()
+            .map(|str| Elem::Symbol(*str))
+            .collect();
         let vec2: Vec<Elem<&str>> = vec!["a", "b", "c", "d", "e"]
             .iter()
             .map(|str| Elem::Symbol(*str))
@@ -231,6 +248,14 @@ mod test {
                 Elem::String("there"),
             ])]),
         ));
+
+        assert_eq!(res, target);
+    }
+
+    #[test]
+    fn test_tokenize_1() {
+        let res = tokenize(r#"("#);
+        let target: Result<Elem<String>, String> = Err("".to_string());
 
         assert_eq!(res, target);
     }

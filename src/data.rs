@@ -61,7 +61,6 @@ pub enum AST {
     Macro(Ident, Vec<Ident>, Box<AST>),
     Lit(Lit),
     Ident(Ident),
-    // consider a different abstractification procedure for when we're in quote
     Eval(Box<AST>),
     List(Vec<AST>),
     Cons(Box<AST>, Box<AST>),

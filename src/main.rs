@@ -1,8 +1,9 @@
 mod ast;
 mod data;
 mod evaluate;
-mod parse;
 mod expand;
+mod fold;
+mod parse;
 
 use std::{env, fs, io};
 
