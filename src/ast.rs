@@ -99,9 +99,9 @@ impl Elem<String> {
                     Box::new(num1.clone().parse()),
                     Box::new(num2.clone().parse()),
                 ),
-                [Elem::Symbol(ident), rest @ ..] => AST::Call(
+                [Elem::Symbol(ident), rest @ ..] => AST::ExpandCall(
                     (*ident).as_str().into(),
-                    rest.iter().map(|elem| elem.to_owned().parse()).collect(),
+                    rest.iter().map(|elem| quote_elem(elem)).collect(),
                 ),
                 other => panic!("Unable to abstractify: {:#?}", other),
             },

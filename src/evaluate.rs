@@ -1,31 +1,8 @@
-use std::collections::HashMap;
-
-use crate::data::{Ident, Lit, Toplevel, AST};
-
-#[derive(Clone)]
-struct Env(pub HashMap<Ident, AST>);
-
-impl Env {
-    fn insert(&mut self, ident: Ident, ast: AST) -> Self {
-        match self {
-            Env(map) => {
-                map.insert(ident, ast);
-                Env(map.clone())
-            }
-        }
-    }
-
-    fn lookup(&mut self, ident: &Ident) -> Result<AST, String> {
-        match self {
-            Env(map) => map
-                .get(&ident)
-                .cloned()
-                .ok_or(format!("No binding found: {:?}", ident)),
-        }
-    }
-}
+use crate::data::{Env, Lit, Toplevel, AST};
 
 pub fn evaluate(Toplevel(forms): Toplevel) -> Result<Lit, String> {
+    use std::collections::HashMap;
+
     evaluate_top(forms, Env(HashMap::new()))
 }
 

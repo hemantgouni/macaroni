@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 #[derive(Debug, Eq, PartialEq, Clone)]
 pub enum Elem<A> {
     String(A),
@@ -57,8 +59,9 @@ impl Lit {
 #[derive(Debug, Eq, PartialEq, Clone)]
 pub enum AST {
     Func(Ident, Vec<Ident>, Box<AST>),
-    Call(Ident, Vec<AST>),
     Macro(Ident, Vec<Ident>, Box<AST>),
+    Call(Ident, Vec<AST>),
+    ExpandCall(Ident, Vec<Lit>),
     Lit(Lit),
     Ident(Ident),
     Eval(Box<AST>),
@@ -80,4 +83,27 @@ pub enum AST {
     Sub(Box<AST>, Box<AST>),
     Mult(Box<AST>, Box<AST>),
     Mod(Box<AST>, Box<AST>),
+}
+
+#[derive(Clone)]
+pub struct Env(pub HashMap<Ident, AST>);
+
+impl Env {
+    pub fn insert(&mut self, ident: Ident, ast: AST) -> Self {
+        match self {
+            Env(map) => {
+                map.insert(ident, ast);
+                Env(map.clone())
+            }
+        }
+    }
+
+    pub fn lookup(&mut self, ident: &Ident) -> Result<AST, String> {
+        match self {
+            Env(map) => map
+                .get(&ident)
+                .cloned()
+                .ok_or(format!("No binding found: {:?}", ident)),
+        }
+    }
 }
