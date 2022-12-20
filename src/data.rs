@@ -61,7 +61,7 @@ pub enum AST {
     Func(Ident, Vec<Ident>, Box<AST>),
     Macro(Ident, Vec<Ident>, Box<AST>),
     Call(Ident, Vec<AST>),
-    ExpandCall(Ident, Vec<Lit>),
+    MacroCall(Ident, Vec<Lit>),
     Lit(Lit),
     Ident(Ident),
     Eval(Box<AST>),

@@ -8,7 +8,7 @@ fn expand_top(program: Toplevel, environment: Env) -> Toplevel {
 
 fn expand(expr: AST, mut environment: Env) -> Result<AST, String> {
     match expr {
-        AST::ExpandCall(ident, actual_args) => match environment.lookup(&ident) {
+        AST::MacroCall(ident, actual_args) => match environment.lookup(&ident) {
             Ok(AST::Macro(_, formal_args, body)) => {
                 let binding_list: Vec<(Ident, Lit)> = formal_args
                     .iter()
