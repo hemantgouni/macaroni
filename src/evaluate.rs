@@ -1,9 +1,7 @@
 use crate::data::{Env, Lit, Toplevel, AST};
 
 pub fn evaluate(Toplevel(forms): Toplevel) -> Result<Lit, String> {
-    use std::collections::HashMap;
-
-    evaluate_top(forms, Env(HashMap::new()))
+    evaluate_top(forms, Env::new())
 }
 
 fn evaluate_top(forms: Vec<AST>, mut environment: Env) -> Result<Lit, String> {

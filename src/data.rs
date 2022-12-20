@@ -86,9 +86,14 @@ pub enum AST {
 }
 
 #[derive(Clone)]
-pub struct Env(pub HashMap<Ident, AST>);
+pub struct Env(HashMap<Ident, AST>);
 
+// This type is worked with immutably
 impl Env {
+    pub fn new() -> Self {
+        Env(HashMap::new())
+    }
+
     pub fn insert(&mut self, ident: Ident, ast: AST) -> Self {
         match self {
             Env(map) => {

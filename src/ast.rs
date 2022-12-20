@@ -99,7 +99,7 @@ impl Elem<String> {
                     Box::new(num1.clone().parse()),
                     Box::new(num2.clone().parse()),
                 ),
-                [Elem::Symbol(ident), rest @ ..] => AST::ExpandCall(
+                [Elem::Symbol(ident), rest @ ..] => AST::MacroCall(
                     (*ident).as_str().into(),
                     rest.iter().map(|elem| quote_elem(elem)).collect(),
                 ),

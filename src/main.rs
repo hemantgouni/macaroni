@@ -4,6 +4,7 @@ mod evaluate;
 mod expand;
 mod fold;
 mod parse;
+mod utils;
 
 use std::{env, fs, io};
 
@@ -17,11 +18,13 @@ use crate::data::Toplevel;
 fn main() -> io::Result<()> {
     let args: Vec<String> = env::args().collect();
 
-    let contents = fs::read_to_string(args.get(1).unwrap_or(&String::from("input.lisp")))
+    let contents = fs::read_to_string(args.get(1).unwrap_or(&String::from("input.mcr")))
         .expect("No such file or directory!");
 
     let ast: Toplevel = parse::tokenize(&contents).unwrap().parse_toplevel();
     println!("AST: {:#?}", ast);
+
+    // let expanded_ast: Toplevel = expand::expand_top(ast);
 
     let res = evaluate::evaluate(ast.clone());
     println!("Result: {:#?}", res);
