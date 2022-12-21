@@ -1,4 +1,5 @@
 use crate::data::{Env, Ident, Lit, Toplevel, AST};
+use crate::evaluate::evaluate_expr;
 use crate::utils::concat;
 
 fn expand_expr(expr: AST, mut environment: Env) -> Result<AST, String> {
@@ -20,7 +21,9 @@ fn expand_expr(expr: AST, mut environment: Env) -> Result<AST, String> {
                             Ok(env?.insert(ident.to_owned(), AST::Lit(lit.to_owned())))
                         });
 
-                expand_expr(*body, environment?)
+                let expanded: AST = expand_expr(*body, environment.clone()?)?;
+
+                evaluate_expr(expanded, environment?).map(|lit| lit.to_elem().parse())
             }
             Ok(AST::Func(..)) => Ok(AST::Call(
                 ident,
@@ -57,7 +60,7 @@ fn expand_expr(expr: AST, mut environment: Env) -> Result<AST, String> {
             Box::new(expand_expr(*expr1, environment.clone())?),
             Box::new(expand_expr(*expr2, environment.clone())?),
         )),
-        AST::Lit(lit) => Ok(lit.to_elem().parse()),
+        AST::Lit(lit) => Ok(AST::Lit(lit)),
         AST::Ident(ident) => environment.lookup(&ident),
         other => Err(format!("Macro expansion yet implemented for {:?}", other)),
     }
