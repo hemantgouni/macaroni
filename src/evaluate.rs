@@ -16,7 +16,7 @@ fn evaluate_top(forms: Vec<AST>, mut environment: Env) -> Result<Lit, String> {
         ),
         // this stops registering functions at the first non-decl form
         [expr, ..] => evaluate_expr(expr.clone(), environment),
-        [] => Err("No top-level forms or evaluable expressions provided!".into()),
+        [] => Err("Evaluator: This should never have gotten past the expander, this is a bug!".into()),
     }
 }
 

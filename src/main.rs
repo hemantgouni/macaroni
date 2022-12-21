@@ -24,9 +24,10 @@ fn main() -> io::Result<()> {
     let ast: Toplevel = parse::tokenize(&contents).unwrap().parse_toplevel();
     println!("AST: {:#?}", ast);
 
-    // let expanded_ast: Toplevel = expand::expand_top(ast);
+    let expanded_ast: Toplevel = expand::expand(ast).unwrap();
+    println!("AST (Expanded): {:#?}", expanded_ast);
 
-    let res = evaluate::evaluate(ast.clone());
+    let res = evaluate::evaluate(expanded_ast.clone());
     println!("Result: {:#?}", res);
 
     Ok(())
