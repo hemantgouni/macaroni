@@ -1,4 +1,5 @@
 use crate::data::{Env, Lit, Toplevel, AST};
+use crate::expand::expand;
 
 pub fn evaluate(Toplevel(forms): Toplevel) -> Result<Lit, String> {
     evaluate_top(forms, Env::new())
@@ -16,7 +17,9 @@ pub fn evaluate_top(forms: Vec<AST>, mut environment: Env) -> Result<Lit, String
         ),
         // this stops registering functions at the first non-decl form
         [expr, ..] => evaluate_expr(expr.clone(), environment),
-        [] => Err("Evaluator: This should never have gotten past the expander, this is a bug!".into()),
+        [] => {
+            Err("Evaluator: This should never have gotten past the expander, this is a bug!".into())
+        }
     }
 }
 
@@ -238,12 +241,15 @@ mod test {
     #[test]
     fn test_evaluate_func() {
         let res: Lit = evaluate(
-            tokenize(
-                "((fn add1 (num) (+ num 1))
-                  (add1 1))",
+            expand(
+                tokenize(
+                    "((fn add1 (num) (+ num 1))
+                      (add1 1))",
+                )
+                .unwrap()
+                .parse_toplevel(),
             )
-            .unwrap()
-            .parse_toplevel(),
+            .unwrap(),
         )
         .unwrap();
         let target: Lit = Lit::I64(2);
@@ -254,15 +260,18 @@ mod test {
     #[test]
     fn test_evaluate_func_rec() {
         let res: Lit = evaluate(
-            tokenize(
-                "((fn exp (base exponent)
-                     (if (== exponent 0)
+            expand(
+                tokenize(
+                    "((fn exp (base exponent)
+                      (if (== exponent 0)
                          1
                          (* base (exp base (- exponent 1)))))
-                  (exp 2 4))",
+                      (exp 2 4))",
+                )
+                .unwrap()
+                .parse_toplevel(),
             )
-            .unwrap()
-            .parse_toplevel(),
+            .unwrap(),
         )
         .unwrap();
         let target: Lit = Lit::I64(16);
@@ -736,14 +745,17 @@ mod test {
     #[test]
     fn test_eval_4() {
         let res: Lit = evaluate(
-            tokenize(
-                r#"
+            expand(
+                tokenize(
+                    r#"
                 ((fn gen-quoted-list () (quote (1 1)))
                  (eval (cons (quote +) (gen-quoted-list))))
                 "#,
+                )
+                .unwrap()
+                .parse_toplevel(),
             )
-            .unwrap()
-            .parse_toplevel(),
+            .unwrap(),
         )
         .unwrap();
 
@@ -755,16 +767,19 @@ mod test {
     #[test]
     fn test_eval_5() {
         let res: Lit = evaluate(
-            tokenize(
-                r#"
+            expand(
+                tokenize(
+                    r#"
                 ((fn return-two-numbers ()
                      (quote (4 4)))
                  (eval
                    (cons (quote *) (cons (quote 4) (list (cons (quote *) (return-two-numbers)))))))
                 "#,
+                )
+                .unwrap()
+                .parse_toplevel(),
             )
-            .unwrap()
-            .parse_toplevel(),
+            .unwrap(),
         )
         .unwrap();
 

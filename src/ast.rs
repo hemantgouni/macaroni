@@ -1,4 +1,5 @@
 use crate::data::{Elem, Ident, Lit, Toplevel, AST};
+use crate::expand::expand;
 
 fn quote_elem(elem: &Elem<String>) -> Lit {
     // Hey, this is basically the lexed representation of the code!!!!
@@ -353,10 +354,11 @@ mod test {
             ((fn add1 (num)
               (+ num 1))
              (add1 1))
-        ",
+            ",
         )
         .unwrap()
         .parse_toplevel();
+        let res_expanded: Toplevel = expand(res).unwrap();
         let target: Toplevel = Toplevel(vec![
             AST::Func(
                 "add1".into(),
@@ -368,7 +370,7 @@ mod test {
             ),
             AST::Call("add1".into(), vec![AST::Lit(Lit::I64(1))]),
         ]);
-        assert_eq!(res, target);
+        assert_eq!(res_expanded, target);
     }
 
     // #[test]

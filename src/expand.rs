@@ -21,9 +21,9 @@ fn expand_expr(expr: AST, mut environment: Env) -> Result<AST, String> {
                             Ok(env?.insert(ident.to_owned(), AST::Lit(lit.to_owned())))
                         });
 
-                let expanded: AST = expand_expr(*body, environment.clone()?)?;
+                let expanded: AST = dbg!(expand_expr(*body, environment.clone()?)?);
 
-                evaluate_expr(expanded, environment?).map(|lit| lit.to_elem().parse())
+                dbg!(evaluate_expr(expanded, environment?)).map(|lit| lit.to_elem().parse())
             }
             Ok(AST::Func(..)) => Ok(AST::Call(
                 ident,
@@ -31,7 +31,10 @@ fn expand_expr(expr: AST, mut environment: Env) -> Result<AST, String> {
                     Ok(vec![]),
                     |arg_vec: Result<Vec<AST>, String>, expr: &Lit| {
                         Ok(concat(
-                            vec![expand_expr(AST::Lit(expr.clone()), environment.clone())?],
+                            vec![expand_expr(
+                                expr.clone().to_elem().parse(),
+                                environment.clone(),
+                            )?],
                             arg_vec?,
                         ))
                     },
@@ -60,6 +63,7 @@ fn expand_expr(expr: AST, mut environment: Env) -> Result<AST, String> {
             Box::new(expand_expr(*expr1, environment.clone())?),
             Box::new(expand_expr(*expr2, environment.clone())?),
         )),
+        AST::Cdr(expr) => Ok(AST::Cdr(Box::new(expand_expr(*expr, environment.clone())?))),
         AST::Lit(lit) => Ok(AST::Lit(lit)),
         AST::Ident(ident) => environment.lookup(&ident),
         other => Err(format!("Macro expansion yet implemented for {:?}", other)),
