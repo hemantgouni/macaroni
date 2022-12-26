@@ -31,18 +31,17 @@ fn expand_expr(expr: AST, mut environment: Env) -> Result<AST, String> {
                     Ok(vec![]),
                     |arg_vec: Result<Vec<AST>, String>, expr: &Lit| {
                         Ok(concat(
+                            // TODO: see if we made this mistake anywhere else!!
+                            arg_vec?,
                             vec![expand_expr(
                                 expr.clone().to_elem().parse(),
                                 environment.clone(),
                             )?],
-                            arg_vec?,
                         ))
                     },
                 )?,
             )),
-            _ => Err(format!(
-                "Unexpected or non-existent top-level binding in environment!"
-            )),
+            _ => Err("Unexpected or non-existent top-level binding in environment!".to_string()),
         },
         AST::Eval(expr) => Ok(AST::Eval(Box::new(expand_expr(*expr, environment)?))),
         AST::List(exprs) => Ok(AST::List({
@@ -59,38 +58,94 @@ fn expand_expr(expr: AST, mut environment: Env) -> Result<AST, String> {
             Box::new(expand_expr(*expr1, environment.clone())?),
             Box::new(expand_expr(*expr2, environment.clone())?),
         )),
+        AST::Sub(expr1, expr2) => Ok(AST::Sub(
+            Box::new(expand_expr(*expr1, environment.clone())?),
+            Box::new(expand_expr(*expr2, environment.clone())?),
+        )),
+        AST::Mult(expr1, expr2) => Ok(AST::Mult(
+            Box::new(expand_expr(*expr1, environment.clone())?),
+            Box::new(expand_expr(*expr2, environment.clone())?),
+        )),
         AST::Cons(expr1, expr2) => Ok(AST::Cons(
             Box::new(expand_expr(*expr1, environment.clone())?),
             Box::new(expand_expr(*expr2, environment.clone())?),
         )),
         AST::Cdr(expr) => Ok(AST::Cdr(Box::new(expand_expr(*expr, environment.clone())?))),
+        AST::Ite(guard, expr1, expr2) => Ok(AST::Ite(
+            Box::new(expand_expr(*guard, environment.clone())?),
+            Box::new(expand_expr(*expr1, environment.clone())?),
+            Box::new(expand_expr(*expr2, environment.clone())?),
+        )),
+        AST::Eq(expr1, expr2) => Ok(AST::Eq(
+            Box::new(expand_expr(*expr1, environment.clone())?),
+            Box::new(expand_expr(*expr2, environment.clone())?),
+        )),
         AST::Lit(lit) => Ok(AST::Lit(lit)),
         AST::Ident(ident) => environment.lookup(&ident),
         other => Err(format!("Macro expansion yet implemented for {:?}", other)),
     }
 }
 
-fn expand_top(forms: Vec<AST>, mut environment: Env) -> Result<Vec<AST>, String> {
+fn expand_top(forms: Vec<AST>, in_env: Env, mut out_env: Env) -> Result<Vec<AST>, String> {
     match forms.as_slice() {
-        [func @ AST::Func(ident, _, _), rest @ ..] => {
-            let res: Vec<AST> = expand_top(
-                rest.to_vec(),
-                environment.insert(ident.clone(), func.clone()),
+        [AST::Func(ident, args, body), rest @ ..] | [AST::Macro(ident, args, body), rest @ ..] => {
+            let binding_list: Vec<(Ident, Lit)> = args
+                .iter()
+                .map(|Ident(arg_str)| {
+                    (Ident(arg_str.to_string()), Lit::Symbol(arg_str.to_string()))
+                })
+                .collect();
+
+            let bind_env: Env = binding_list.iter().fold(
+                Ok(in_env.to_owned()),
+                |env: Result<Env, String>, (ident, lit)| {
+                    // We shouldn't expand the lit binding here, since the macro must receive
+                    // it as syntax, unmodified
+                    Ok(env?.insert(ident.to_owned(), AST::Lit(lit.to_owned())))
+                },
             )?;
-            Ok(concat(vec![func.clone()], res))
+
+            let expanded_func: AST = AST::Func(
+                ident.to_owned(),
+                args.to_owned(),
+                Box::new(expand_expr(*body.to_owned(), bind_env.to_owned())?),
+            );
+
+            Ok(concat(
+                vec![expanded_func.to_owned()],
+                expand_top(
+                    rest.to_vec(),
+                    in_env,
+                    out_env.insert(ident.to_owned(), expanded_func),
+                )?,
+            ))
         }
-        [mac @ AST::Macro(ident, _, _), rest @ ..] => {
-            let res: Vec<AST> = expand_top(
-                rest.to_vec(),
-                environment.insert(ident.clone(), mac.clone()),
-            )?;
-            Ok(concat(vec![mac.clone()], res))
-        }
-        [expr, ..] => Ok(vec![expand_expr(expr.clone(), environment.clone())?]),
-        [] => Err("Expander: no top-level forms or evaluable expressions provided!".into()),
+        [expr, ..] => Ok(vec![expand_expr(expr.to_owned(), out_env)?]),
+        [] => Err(
+            "expand_top either didn't find any top-level forms or a runnable expr. This is a bug!"
+                .to_string(),
+        ),
+    }
+}
+
+fn register_top(forms: Vec<AST>, mut environment: Env) -> Env {
+    match forms.as_slice() {
+        [func @ AST::Func(ident, _, _), rest @ ..] => register_top(
+            rest.to_vec(),
+            environment.insert(ident.clone(), func.clone()),
+        ),
+        [mac @ AST::Macro(ident, _, _), rest @ ..] => register_top(
+            rest.to_vec(),
+            environment.insert(ident.clone(), mac.clone()),
+        ),
+        [..] => environment,
     }
 }
 
 pub fn expand(Toplevel(forms): Toplevel) -> Result<Toplevel, String> {
-    Ok(Toplevel(expand_top(forms, Env::new())?))
+    Ok(Toplevel(expand_top(
+        forms.to_owned(),
+        register_top(forms, Env::new()),
+        Env::new(),
+    )?))
 }

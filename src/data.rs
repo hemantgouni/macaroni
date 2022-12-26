@@ -41,6 +41,7 @@ pub enum Lit {
     Bool(bool),
     String(String),
     Symbol(String),
+    // IdentSymbol(String),
     List(Vec<Lit>),
 }
 

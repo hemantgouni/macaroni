@@ -1,5 +1,4 @@
-use crate::data::{Env, Lit, Toplevel, AST};
-use crate::expand::expand;
+use crate::data::{Env, Ident, Lit, Toplevel, AST};
 
 pub fn evaluate(Toplevel(forms): Toplevel) -> Result<Lit, String> {
     evaluate_top(forms, Env::new())
@@ -77,7 +76,12 @@ pub fn evaluate_expr(program: AST, mut environment: Env) -> Result<Lit, String> 
             (Lit::I64(num1), Lit::I64(num2)) => Ok(Lit::I64(num1 * num2)),
             _ => Err("Attempted to multiply two non-numbers!".into()),
         },
-        AST::Lit(lit) => Ok(lit),
+        AST::Lit(lit) => match lit {
+            Lit::Symbol(str) => {
+                dbg!(evaluate_expr(AST::Ident(Ident(dbg!(str))), environment.to_owned()))
+            }
+            _ => Ok(lit),
+        },
         AST::List(elems) => Ok(Lit::List(elems.iter().fold(
             Ok(Vec::new()),
             |results: Result<Vec<Lit>, String>, elem| {
@@ -208,6 +212,7 @@ pub fn evaluate_expr(program: AST, mut environment: Env) -> Result<Lit, String> 
 #[cfg(test)]
 mod test {
     use super::*;
+    use crate::expand::expand;
     use crate::parse::tokenize;
 
     #[test]
