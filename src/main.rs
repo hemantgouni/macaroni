@@ -6,7 +6,7 @@ mod fold;
 mod parse;
 mod utils;
 
-use std::{env, fs, io};
+use std::{env, fs};
 
 use crate::data::Toplevel;
 
@@ -15,7 +15,7 @@ use crate::data::Toplevel;
 // we have parser combinators which are a bunch of functions that make it easier to write parsers,
 // what about the same thing for type checkers?
 
-fn main() -> io::Result<()> {
+fn main() {
     let args: Vec<String> = env::args().collect();
 
     let contents = fs::read_to_string(args.get(1).unwrap_or(&String::from("input.mcr")))
@@ -29,6 +29,4 @@ fn main() -> io::Result<()> {
 
     let res = evaluate::evaluate(expanded_ast);
     println!("Result: {:#?}", res);
-
-    Ok(())
 }
