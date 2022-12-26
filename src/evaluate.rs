@@ -455,8 +455,9 @@ mod test {
     #[test]
     fn test_sort_empty() {
         let res: Lit = evaluate(
-            tokenize(
-                r#"
+            expand(
+                tokenize(
+                    r#"
                 ((fn length (input-list)
                    (if (empty? input-list) 0 (+ 1 (length (cdr input-list)))))
                  (fn merge (input-list-1 input-list-2)
@@ -483,9 +484,11 @@ mod test {
                                 (sort (drop half-length input-list))))))
                  (sort (list)))
                 "#,
+                )
+                .unwrap()
+                .parse_toplevel(),
             )
-            .unwrap()
-            .parse_toplevel(),
+            .unwrap(),
         )
         .unwrap();
 
@@ -497,8 +500,9 @@ mod test {
     #[test]
     fn test_sort_singleton() {
         let res: Lit = evaluate(
-            tokenize(
-                r#"
+            expand(
+                tokenize(
+                    r#"
                 ((fn length (input-list)
                    (if (empty? input-list) 0 (+ 1 (length (cdr input-list)))))
                  (fn merge (input-list-1 input-list-2)
@@ -525,9 +529,11 @@ mod test {
                                 (sort (drop half-length input-list))))))
                  (sort (list 1)))
                 "#,
+                )
+                .unwrap()
+                .parse_toplevel(),
             )
-            .unwrap()
-            .parse_toplevel(),
+            .unwrap(),
         )
         .unwrap();
 
@@ -539,8 +545,9 @@ mod test {
     #[test]
     fn test_sort_id() {
         let res: Lit = evaluate(
-            tokenize(
-                r#"
+            expand(
+                tokenize(
+                    r#"
                 ((fn length (input-list)
                    (if (empty? input-list) 0 (+ 1 (length (cdr input-list)))))
                  (fn merge (input-list-1 input-list-2)
@@ -567,9 +574,11 @@ mod test {
                                 (sort (drop half-length input-list))))))
                  (sort (list 3 4 8 7 7 11 11)))
                 "#,
+                )
+                .unwrap()
+                .parse_toplevel(),
             )
-            .unwrap()
-            .parse_toplevel(),
+            .unwrap(),
         )
         .unwrap();
 
@@ -589,8 +598,9 @@ mod test {
     #[test]
     fn test_sort() {
         let res: Lit = evaluate(
-            tokenize(
-                r#"
+            expand(
+                tokenize(
+                    r#"
                 ((fn length (input-list)
                    (if (empty? input-list) 0 (+ 1 (length (cdr input-list)))))
                  (fn merge (input-list-1 input-list-2)
@@ -617,9 +627,11 @@ mod test {
                                 (sort (drop half-length input-list))))))
                  (sort (list 8 3 4 11 7 11 7)))
                 "#,
+                )
+                .unwrap()
+                .parse_toplevel(),
             )
-            .unwrap()
-            .parse_toplevel(),
+            .unwrap(),
         )
         .unwrap();
 

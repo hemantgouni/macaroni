@@ -4,7 +4,7 @@ use crate::utils::concat;
 
 fn expand_expr(expr: AST, mut environment: Env) -> Result<AST, String> {
     match expr {
-        AST::MacroCall(ident, actual_args) => match environment.lookup(&ident) {
+        AST::MacroCall(ident, actual_args) => match environment.lookup(dbg!(&ident)) {
             Ok(AST::Macro(_, formal_args, body)) => {
                 let binding_list: Vec<(Ident, Lit)> = formal_args
                     .iter()
@@ -70,9 +70,20 @@ fn expand_expr(expr: AST, mut environment: Env) -> Result<AST, String> {
             Box::new(expand_expr(*expr1, environment.clone())?),
             Box::new(expand_expr(*expr2, environment.clone())?),
         )),
+        AST::Car(expr) => Ok(AST::Car(Box::new(expand_expr(*expr, environment.clone())?))),
         AST::Cdr(expr) => Ok(AST::Cdr(Box::new(expand_expr(*expr, environment.clone())?))),
+        // We need to do the same rewriting thing here!
+        AST::Let(var, binding, expr) => Ok(AST::Let(
+            var,
+            Box::new(expand_expr(*binding, environment.clone())?),
+            Box::new(expand_expr(*expr, environment.clone())?),
+        )),
         AST::Ite(guard, expr1, expr2) => Ok(AST::Ite(
             Box::new(expand_expr(*guard, environment.clone())?),
+            Box::new(expand_expr(*expr1, environment.clone())?),
+            Box::new(expand_expr(*expr2, environment.clone())?),
+        )),
+        AST::Lt(expr1, expr2) => Ok(AST::Lt(
             Box::new(expand_expr(*expr1, environment.clone())?),
             Box::new(expand_expr(*expr2, environment.clone())?),
         )),
@@ -80,6 +91,10 @@ fn expand_expr(expr: AST, mut environment: Env) -> Result<AST, String> {
             Box::new(expand_expr(*expr1, environment.clone())?),
             Box::new(expand_expr(*expr2, environment.clone())?),
         )),
+        AST::Emptyp(expr) => Ok(AST::Emptyp(Box::new(expand_expr(
+            *expr,
+            environment.clone(),
+        )?))),
         AST::Lit(lit) => Ok(AST::Lit(lit)),
         AST::Ident(ident) => environment.lookup(&ident),
         other => Err(format!("Macro expansion yet implemented for {:?}", other)),
