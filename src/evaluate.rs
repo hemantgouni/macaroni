@@ -1,4 +1,4 @@
-use crate::data::{Env, Ident, Lit, Toplevel, AST};
+use crate::data::{Env, Lit, Toplevel, AST};
 
 pub fn evaluate(Toplevel(forms): Toplevel) -> Result<Lit, String> {
     evaluate_top(forms, Env::new())
@@ -85,14 +85,14 @@ pub fn evaluate_expr(program: AST, mut environment: Env) -> Result<Lit, String> 
                 Ok(results)
             },
         )?)),
-        AST::Car(list) => match evaluate_expr(*list.to_owned(), environment.to_owned())? {
+        AST::Car(list) => match evaluate_expr(*list, environment.to_owned())? {
             Lit::List(lits) => match lits.as_slice() {
                 [first, ..] => Ok((*first).clone()),
                 [] => Err("No elements remaining in list given to car!".to_string()),
             },
             other => Err(format!("Non-list given as argument to cons: {:?}", other)),
         },
-        AST::Cdr(list) => match evaluate_expr(*list.to_owned(), environment.to_owned())? {
+        AST::Cdr(list) => match evaluate_expr(*list, environment.to_owned())? {
             Lit::List(lits) => match lits.as_slice() {
                 [_, rest @ ..] => Ok(Lit::List(rest.to_vec())),
                 [] => Err("No elements remaining in list given to cdr!".to_string()),
@@ -100,8 +100,8 @@ pub fn evaluate_expr(program: AST, mut environment: Env) -> Result<Lit, String> 
             other => Err(format!("Non-list given as argument to cons: {:?}", other)),
         },
         AST::Cons(elem, list) => {
-            let elem = evaluate_expr(*elem.to_owned(), environment.to_owned())?;
-            let list = evaluate_expr(*list.to_owned(), environment.to_owned())?;
+            let elem = evaluate_expr(*elem, environment.to_owned())?;
+            let list = evaluate_expr(*list, environment.to_owned())?;
 
             match list {
                 Lit::List(mut elems) => {

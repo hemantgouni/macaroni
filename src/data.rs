@@ -194,7 +194,7 @@ impl Env {
     pub fn lookup(&mut self, ident: &Ident) -> Result<AST, String> {
         match self {
             Env(map) => map
-                .get(&ident)
+                .get(ident)
                 .cloned()
                 .ok_or(format!("No binding found: {:?}", ident)),
         }

@@ -27,7 +27,7 @@ fn main() -> io::Result<()> {
     let expanded_ast: Toplevel = expand::expand(ast).unwrap();
     println!("AST (Expanded): {:#?}", expanded_ast);
 
-    let res = evaluate::evaluate(expanded_ast.clone());
+    let res = evaluate::evaluate(expanded_ast);
     println!("Result: {:#?}", res);
 
     Ok(())

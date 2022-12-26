@@ -1,12 +1,11 @@
 use crate::data::{Elem, Ident, Lit, Toplevel, AST};
-use crate::expand::expand;
 
 fn quote_elem(elem: &Elem<String>) -> Lit {
     // Hey, this is basically the lexed representation of the code!!!!
     match elem {
         Elem::String(str) => Lit::String(str.to_string()),
         Elem::Symbol(str) => Lit::Symbol(str.to_string()),
-        Elem::List(elems) => Lit::List(elems.iter().map(|elem| quote_elem(elem)).collect()),
+        Elem::List(elems) => Lit::List(elems.iter().map(quote_elem).collect()),
     }
 }
 
@@ -14,7 +13,7 @@ fn quote_elem(elem: &Elem<String>) -> Lit {
 impl Elem<String> {
     pub fn parse(self) -> AST {
         match self {
-            Elem::String(str) => AST::Lit(Lit::String(str.into())),
+            Elem::String(str) => AST::Lit(Lit::String(str)),
             Elem::Symbol(str) => str
                 .to_string()
                 .parse::<i64>()
@@ -102,7 +101,7 @@ impl Elem<String> {
                 ),
                 [Elem::Symbol(ident), rest @ ..] => AST::MacroCall(
                     (*ident).as_str().into(),
-                    rest.iter().map(|elem| quote_elem(elem)).collect(),
+                    rest.iter().map(quote_elem).collect(),
                 ),
                 other => panic!("Unable to abstractify: {:#?}", other),
             },
@@ -168,6 +167,7 @@ impl Elem<String> {
 #[cfg(test)]
 mod test {
     use super::*;
+    use crate::expand::expand;
     use crate::parse::tokenize;
 
     #[test]

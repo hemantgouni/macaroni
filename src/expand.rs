@@ -117,7 +117,7 @@ fn expand_expr(expr: AST, mut environment: Env) -> Result<AST, String> {
             Ok(AST::Let(
                 Ident(string),
                 Box::new(expand_expr(*binding, environment.clone())?),
-                Box::new(expand_expr(*expr, environment.clone())?),
+                Box::new(expand_expr(*expr, environment)?),
             )
             .rewrite())
         }
@@ -190,7 +190,7 @@ fn expand_top(forms: Vec<AST>, in_env: Env, mut out_env: Env) -> Result<Vec<AST>
             let expanded_func: AST = AST::Func(
                 ident.to_owned(),
                 args.to_owned(),
-                Box::new(expand_expr(*body.to_owned(), bind_env.to_owned())?.rewrite()),
+                Box::new(expand_expr(*body.to_owned(), bind_env)?.rewrite()),
             );
 
             Ok(concat(
@@ -231,7 +231,7 @@ fn expand_top(forms: Vec<AST>, in_env: Env, mut out_env: Env) -> Result<Vec<AST>
             let expanded_func: AST = AST::Macro(
                 ident.to_owned(),
                 args.to_owned(),
-                Box::new(expand_expr(*body.to_owned(), bind_env.to_owned())?.rewrite()),
+                Box::new(expand_expr(*body.to_owned(), bind_env)?.rewrite()),
             );
 
             Ok(concat(
@@ -271,4 +271,40 @@ pub fn expand(Toplevel(forms): Toplevel) -> Result<Toplevel, String> {
         register_top(forms, Env::new()),
         Env::new(),
     )?))
+}
+
+mod test {
+
+    #[test]
+    fn test_expand_let() {
+        use super::*;
+        use crate::evaluate::evaluate;
+        use crate::parse::tokenize;
+        let program: Toplevel = tokenize(
+            "
+            ((fn fst (list-variable)
+                (car list-variable))
+             (fn snd (list-variable)
+                (car (cdr list-variable)))
+             (fn mlet-helper (bind-list body)
+                (if (empty? bind-list)
+                    body
+                    (let pair (fst bind-list)
+                      (list
+                        (quote let)
+                        (fst pair)
+                        (snd pair)
+                        (mlet-helper (cdr bind-list) body)))))
+             (macro mlet (bind-list body)
+                (mlet-helper bind-list body))
+             (mlet ((a 4) (b 3) (c 5) (d 8)) (+ d (* c (+ a b)))))
+             ",
+        )
+        .unwrap()
+        .parse_toplevel();
+
+        let result: Lit = evaluate(expand(program).unwrap()).unwrap();
+
+        assert_eq!(result, Lit::I64(43));
+    }
 }
