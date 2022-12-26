@@ -3,13 +3,13 @@ use crate::evaluate::evaluate_expr;
 use crate::utils::concat;
 
 fn expand_expr(expr: AST, mut environment: Env) -> Result<AST, String> {
-    match expr {
-        AST::MacroCall(ident, actual_args) => match environment.lookup(dbg!(&ident)) {
+    match dbg!(expr) {
+        AST::MacroCall(ident, actual_args) => match environment.lookup(&ident) {
             Ok(AST::Macro(_, formal_args, body)) => {
                 let binding_list: Vec<(Ident, Lit)> = formal_args
                     .iter()
                     .map(|ident| ident.to_owned())
-                    .zip(actual_args)
+                    .zip(dbg!(actual_args))
                     .collect();
 
                 let environment: Result<Env, String> =
@@ -21,9 +21,9 @@ fn expand_expr(expr: AST, mut environment: Env) -> Result<AST, String> {
                             Ok(env?.insert(ident.to_owned(), AST::Lit(lit.to_owned())))
                         });
 
-                let expanded: AST = dbg!(expand_expr(*body, environment.clone()?)?);
+                let expanded: AST = expand_expr(*body, environment.clone()?)?;
 
-                dbg!(evaluate_expr(expanded, environment?)).map(|lit| lit.to_elem().parse())
+                evaluate_expr(expanded, environment?).map(|lit| lit.to_elem().parse())
             }
             Ok(AST::Func(..)) => Ok(AST::Call(
                 ident,
@@ -41,8 +41,24 @@ fn expand_expr(expr: AST, mut environment: Env) -> Result<AST, String> {
                     },
                 )?,
             )),
-            _ => Err("Unexpected or non-existent top-level binding in environment!".to_string()),
+            other => Err(format!(
+                "Unexpected or non-existent top-level binding in environment: {:?}",
+                other
+            )),
         },
+        // TODO: Figure out why we need this!
+        AST::Call(ident, actual_args) => Ok(AST::Call(
+            ident,
+            actual_args.iter().fold(
+                Ok(Vec::new()),
+                |args: Result<Vec<AST>, String>, arg: &AST| {
+                    Ok(concat(
+                        args?,
+                        vec![expand_expr(arg.to_owned(), environment.clone())?],
+                    ))
+                },
+            )?,
+        )),
         AST::Eval(expr) => Ok(AST::Eval(Box::new(expand_expr(*expr, environment)?))),
         AST::List(exprs) => Ok(AST::List({
             let exprs: Result<Vec<AST>, String> =
@@ -66,18 +82,45 @@ fn expand_expr(expr: AST, mut environment: Env) -> Result<AST, String> {
             Box::new(expand_expr(*expr1, environment.clone())?),
             Box::new(expand_expr(*expr2, environment.clone())?),
         )),
+        AST::Div(expr1, expr2) => Ok(AST::Div(
+            Box::new(expand_expr(*expr1, environment.clone())?),
+            Box::new(expand_expr(*expr2, environment.clone())?),
+        )),
+        AST::Mod(expr1, expr2) => Ok(AST::Mod(
+            Box::new(expand_expr(*expr1, environment.clone())?),
+            Box::new(expand_expr(*expr2, environment.clone())?),
+        )),
+        AST::Concat(expr1, expr2) => Ok(AST::Concat(
+            Box::new(expand_expr(*expr1, environment.clone())?),
+            Box::new(expand_expr(*expr2, environment.clone())?),
+        )),
         AST::Cons(expr1, expr2) => Ok(AST::Cons(
             Box::new(expand_expr(*expr1, environment.clone())?),
             Box::new(expand_expr(*expr2, environment.clone())?),
         )),
         AST::Car(expr) => Ok(AST::Car(Box::new(expand_expr(*expr, environment.clone())?))),
         AST::Cdr(expr) => Ok(AST::Cdr(Box::new(expand_expr(*expr, environment.clone())?))),
-        // We need to do the same rewriting thing here!
-        AST::Let(var, binding, expr) => Ok(AST::Let(
-            var,
-            Box::new(expand_expr(*binding, environment.clone())?),
-            Box::new(expand_expr(*expr, environment.clone())?),
-        )),
+        AST::Let(Ident(string), binding, expr) => {
+            let rewrite_to_ident: fn(AST) -> AST = |ast: AST| match ast {
+                AST::Lit(Lit::Symbol(string)) => AST::Ident(Ident(string)),
+                _ => panic!("Ident rewrite lambda called on non-symbol: this is a bug!"),
+            };
+
+            let environment = environment.insert(
+                Ident(string.to_owned()),
+                AST::Rewrite(
+                    Box::new(AST::Lit(Lit::Symbol(string.to_owned()))),
+                    rewrite_to_ident,
+                ),
+            );
+
+            Ok(AST::Let(
+                Ident(string),
+                Box::new(expand_expr(*binding, environment.clone())?),
+                Box::new(expand_expr(*expr, environment.clone())?),
+            )
+            .rewrite())
+        }
         AST::Ite(guard, expr1, expr2) => Ok(AST::Ite(
             Box::new(expand_expr(*guard, environment.clone())?),
             Box::new(expand_expr(*expr1, environment.clone())?),
@@ -87,7 +130,19 @@ fn expand_expr(expr: AST, mut environment: Env) -> Result<AST, String> {
             Box::new(expand_expr(*expr1, environment.clone())?),
             Box::new(expand_expr(*expr2, environment.clone())?),
         )),
+        AST::Gt(expr1, expr2) => Ok(AST::Gt(
+            Box::new(expand_expr(*expr1, environment.clone())?),
+            Box::new(expand_expr(*expr2, environment.clone())?),
+        )),
         AST::Eq(expr1, expr2) => Ok(AST::Eq(
+            Box::new(expand_expr(*expr1, environment.clone())?),
+            Box::new(expand_expr(*expr2, environment.clone())?),
+        )),
+        AST::Or(expr1, expr2) => Ok(AST::Or(
+            Box::new(expand_expr(*expr1, environment.clone())?),
+            Box::new(expand_expr(*expr2, environment.clone())?),
+        )),
+        AST::And(expr1, expr2) => Ok(AST::And(
             Box::new(expand_expr(*expr1, environment.clone())?),
             Box::new(expand_expr(*expr2, environment.clone())?),
         )),
@@ -97,13 +152,16 @@ fn expand_expr(expr: AST, mut environment: Env) -> Result<AST, String> {
         )?))),
         AST::Lit(lit) => Ok(AST::Lit(lit)),
         AST::Ident(ident) => environment.lookup(&ident),
-        other => Err(format!("Macro expansion yet implemented for {:?}", other)),
+        other => Err(format!(
+            "Macro expansion not yet implemented for {:?}",
+            other
+        )),
     }
 }
 
 fn expand_top(forms: Vec<AST>, in_env: Env, mut out_env: Env) -> Result<Vec<AST>, String> {
     match forms.as_slice() {
-        [AST::Func(ident, args, body), rest @ ..] | [AST::Macro(ident, args, body), rest @ ..] => {
+        [AST::Func(ident, args, body), rest @ ..] => {
             let rewrite_to_ident: fn(AST) -> AST = |ast: AST| match ast {
                 AST::Lit(Lit::Symbol(string)) => AST::Ident(Ident(string)),
                 _ => panic!("Ident rewrite lambda called on non-symbol: this is a bug!"),
@@ -130,6 +188,47 @@ fn expand_top(forms: Vec<AST>, in_env: Env, mut out_env: Env) -> Result<Vec<AST>
             )?;
 
             let expanded_func: AST = AST::Func(
+                ident.to_owned(),
+                args.to_owned(),
+                Box::new(expand_expr(*body.to_owned(), bind_env.to_owned())?.rewrite()),
+            );
+
+            Ok(concat(
+                vec![expanded_func.to_owned()],
+                expand_top(
+                    rest.to_vec(),
+                    in_env,
+                    out_env.insert(ident.to_owned(), expanded_func),
+                )?,
+            ))
+        }
+        [AST::Macro(ident, args, body), rest @ ..] => {
+            let rewrite_to_ident: fn(AST) -> AST = |ast: AST| match ast {
+                AST::Lit(Lit::Symbol(string)) => AST::Ident(Ident(string)),
+                _ => panic!("Ident rewrite lambda called on non-symbol: this is a bug!"),
+            };
+
+            let binding_list: Vec<(Ident, AST)> = args
+                .iter()
+                .map(|Ident(arg_str)| {
+                    (
+                        Ident(arg_str.to_string()),
+                        AST::Rewrite(
+                            Box::new(AST::Lit(Lit::Symbol(arg_str.to_string()))),
+                            rewrite_to_ident,
+                        ),
+                    )
+                })
+                .collect();
+
+            let bind_env: Env = binding_list.iter().fold(
+                Ok(in_env.to_owned()),
+                |env: Result<Env, String>, (ident, ast)| {
+                    Ok(env?.insert(ident.to_owned(), ast.to_owned()))
+                },
+            )?;
+
+            let expanded_func: AST = AST::Macro(
                 ident.to_owned(),
                 args.to_owned(),
                 Box::new(expand_expr(*body.to_owned(), bind_env.to_owned())?.rewrite()),

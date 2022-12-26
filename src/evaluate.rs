@@ -193,13 +193,14 @@ pub fn evaluate_expr(program: AST, mut environment: Env) -> Result<Lit, String> 
             (Lit::String(str1), Lit::String(str2)) => Ok(Lit::String(str1 + &str2)),
             other => Err(format!("Non-string arguments given to ++: {:?}", other)),
         },
-        AST::Ident(ident) => environment
+        AST::Ident(ident) => dbg!(environment
             .lookup(&ident)
-            .map(|expr| evaluate_expr(expr, environment))?,
+            .map(|expr| evaluate_expr(expr, environment))?),
         AST::Eval(expr) => {
             let prog = evaluate_expr(*expr, environment.to_owned())?;
             evaluate_expr(prog.to_elem().parse(), environment.to_owned())
         }
+        AST::Rewrite(expr, _) => evaluate_expr(*expr, environment),
         _ => Err(format!("Unable to evaluate the tree {:?}", program)),
     }
 }
