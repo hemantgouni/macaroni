@@ -76,12 +76,7 @@ pub fn evaluate_expr(program: AST, mut environment: Env) -> Result<Lit, String> 
             (Lit::I64(num1), Lit::I64(num2)) => Ok(Lit::I64(num1 * num2)),
             _ => Err("Attempted to multiply two non-numbers!".into()),
         },
-        AST::Lit(lit) => match lit {
-            Lit::Symbol(str) => {
-                dbg!(evaluate_expr(AST::Ident(Ident(dbg!(str))), environment.to_owned()))
-            }
-            _ => Ok(lit),
-        },
+        AST::Lit(lit) => Ok(lit),
         AST::List(elems) => Ok(Lit::List(elems.iter().fold(
             Ok(Vec::new()),
             |results: Result<Vec<Lit>, String>, elem| {

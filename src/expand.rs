@@ -31,7 +31,7 @@ fn expand_expr(expr: AST, mut environment: Env) -> Result<AST, String> {
                     Ok(vec![]),
                     |arg_vec: Result<Vec<AST>, String>, expr: &Lit| {
                         Ok(concat(
-                            // TODO: see if we made this mistake anywhere else!!
+                            // TODO: order matters here; see if we made this mistake anywhere else!!
                             arg_vec?,
                             vec![expand_expr(
                                 expr.clone().to_elem().parse(),
@@ -89,26 +89,35 @@ fn expand_expr(expr: AST, mut environment: Env) -> Result<AST, String> {
 fn expand_top(forms: Vec<AST>, in_env: Env, mut out_env: Env) -> Result<Vec<AST>, String> {
     match forms.as_slice() {
         [AST::Func(ident, args, body), rest @ ..] | [AST::Macro(ident, args, body), rest @ ..] => {
-            let binding_list: Vec<(Ident, Lit)> = args
+            let rewrite_to_ident: fn(AST) -> AST = |ast: AST| match ast {
+                AST::Lit(Lit::Symbol(string)) => AST::Ident(Ident(string)),
+                _ => panic!("Ident rewrite lambda called on non-symbol: this is a bug!"),
+            };
+
+            let binding_list: Vec<(Ident, AST)> = args
                 .iter()
                 .map(|Ident(arg_str)| {
-                    (Ident(arg_str.to_string()), Lit::Symbol(arg_str.to_string()))
+                    (
+                        Ident(arg_str.to_string()),
+                        AST::Rewrite(
+                            Box::new(AST::Lit(Lit::Symbol(arg_str.to_string()))),
+                            rewrite_to_ident,
+                        ),
+                    )
                 })
                 .collect();
 
             let bind_env: Env = binding_list.iter().fold(
                 Ok(in_env.to_owned()),
-                |env: Result<Env, String>, (ident, lit)| {
-                    // We shouldn't expand the lit binding here, since the macro must receive
-                    // it as syntax, unmodified
-                    Ok(env?.insert(ident.to_owned(), AST::Lit(lit.to_owned())))
+                |env: Result<Env, String>, (ident, ast)| {
+                    Ok(env?.insert(ident.to_owned(), ast.to_owned()))
                 },
             )?;
 
             let expanded_func: AST = AST::Func(
                 ident.to_owned(),
                 args.to_owned(),
-                Box::new(expand_expr(*body.to_owned(), bind_env.to_owned())?),
+                Box::new(expand_expr(*body.to_owned(), bind_env.to_owned())?.rewrite()),
             );
 
             Ok(concat(

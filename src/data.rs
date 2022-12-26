@@ -41,7 +41,6 @@ pub enum Lit {
     Bool(bool),
     String(String),
     Symbol(String),
-    // IdentSymbol(String),
     List(Vec<Lit>),
 }
 
@@ -84,6 +83,94 @@ pub enum AST {
     Sub(Box<AST>, Box<AST>),
     Mult(Box<AST>, Box<AST>),
     Mod(Box<AST>, Box<AST>),
+    Rewrite(Box<AST>, fn(AST) -> AST),
+}
+
+impl AST {
+    pub fn rewrite(self) -> AST {
+        match self {
+            AST::Func(name, args, body) => AST::Func(name, args, Box::new(Self::rewrite(*body))),
+            AST::Macro(name, args, body) => AST::Macro(name, args, Box::new(Self::rewrite(*body))),
+            AST::Call(name, args) => AST::Call(
+                name,
+                args.iter()
+                    .map(|arg| Self::rewrite(arg.to_owned()))
+                    .collect(),
+            ),
+            AST::MacroCall(name, args) => AST::MacroCall(name, args),
+            AST::Lit(lit) => AST::Lit(lit),
+            AST::Ident(ident) => AST::Ident(ident),
+            AST::Eval(expr) => AST::Eval(Box::new(Self::rewrite(*expr))),
+            AST::List(exprs) => AST::List(
+                exprs
+                    .iter()
+                    .map(|expr| Self::rewrite(expr.to_owned()))
+                    .collect(),
+            ),
+            AST::Cons(expr1, expr2) => AST::Cons(
+                Box::new(Self::rewrite(*expr1)),
+                Box::new(Self::rewrite(*expr2)),
+            ),
+            AST::Car(expr) => AST::Car(Box::new(Self::rewrite(*expr))),
+            AST::Cdr(expr) => AST::Cdr(Box::new(Self::rewrite(*expr))),
+            AST::Emptyp(expr) => AST::Emptyp(Box::new(Self::rewrite(*expr))),
+            AST::Let(var, expr1, expr2) => AST::Let(
+                var,
+                Box::new(Self::rewrite(*expr1)),
+                Box::new(Self::rewrite(*expr2)),
+            ),
+            AST::Ite(guard, expr1, expr2) => AST::Ite(
+                Box::new(Self::rewrite(*guard)),
+                Box::new(Self::rewrite(*expr1)),
+                Box::new(Self::rewrite(*expr2)),
+            ),
+            AST::And(expr1, expr2) => AST::And(
+                Box::new(Self::rewrite(*expr1)),
+                Box::new(Self::rewrite(*expr2)),
+            ),
+            AST::Or(expr1, expr2) => AST::Or(
+                Box::new(Self::rewrite(*expr1)),
+                Box::new(Self::rewrite(*expr2)),
+            ),
+            AST::Eq(expr1, expr2) => AST::Eq(
+                Box::new(Self::rewrite(*expr1)),
+                Box::new(Self::rewrite(*expr2)),
+            ),
+            AST::Lt(expr1, expr2) => AST::Lt(
+                Box::new(Self::rewrite(*expr1)),
+                Box::new(Self::rewrite(*expr2)),
+            ),
+            AST::Gt(expr1, expr2) => AST::Gt(
+                Box::new(Self::rewrite(*expr1)),
+                Box::new(Self::rewrite(*expr2)),
+            ),
+            AST::Concat(expr1, expr2) => AST::Concat(
+                Box::new(Self::rewrite(*expr1)),
+                Box::new(Self::rewrite(*expr2)),
+            ),
+            AST::Add(expr1, expr2) => AST::Add(
+                Box::new(Self::rewrite(*expr1)),
+                Box::new(Self::rewrite(*expr2)),
+            ),
+            AST::Div(expr1, expr2) => AST::Div(
+                Box::new(Self::rewrite(*expr1)),
+                Box::new(Self::rewrite(*expr2)),
+            ),
+            AST::Sub(expr1, expr2) => AST::Sub(
+                Box::new(Self::rewrite(*expr1)),
+                Box::new(Self::rewrite(*expr2)),
+            ),
+            AST::Mult(expr1, expr2) => AST::Mult(
+                Box::new(Self::rewrite(*expr1)),
+                Box::new(Self::rewrite(*expr2)),
+            ),
+            AST::Mod(expr1, expr2) => AST::Mod(
+                Box::new(Self::rewrite(*expr1)),
+                Box::new(Self::rewrite(*expr2)),
+            ),
+            AST::Rewrite(expr, func) => func(*expr),
+        }
+    }
 }
 
 #[derive(Clone)]
