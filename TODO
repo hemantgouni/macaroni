@@ -1,1 +1,3 @@
 parser tests dont cover tokenize()!
+
+cover all the lits in Eq! doesn't currently cover, eg, lists!
