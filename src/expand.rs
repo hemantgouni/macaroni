@@ -21,11 +21,14 @@ fn expand_expr(expr: AST, mut environment: Env) -> Result<AST, String> {
                             Ok(env?.insert(ident.to_owned(), AST::Lit(lit.to_owned())))
                         });
 
-                let expanded: AST = expand_expr(*body, environment.clone()?)?;
+                // This doesn't do anything! It'll be a bunch of lits, which we need to evaluate
+                // first!
+                //
+                // let expanded: AST = expand_expr(*body, environment.clone()?)?;
 
                 // We need to expand again here in case the evaluated thing contains any macros!
                 expand_expr(
-                    evaluate_expr(dbg!(expanded), environment.clone()?)
+                    evaluate_expr(dbg!(*body), environment.clone()?)
                         .map(|lit| lit.to_elem().parse())?,
                     environment?,
                 )
@@ -281,6 +284,7 @@ pub fn expand(Toplevel(forms): Toplevel) -> Result<Toplevel, String> {
     Ok(Toplevel(expand_top(forms.to_owned(), Env::new())?))
 }
 
+#[cfg(test)]
 mod test {
     use super::*;
     use crate::evaluate::evaluate;
@@ -339,6 +343,73 @@ mod test {
                            (cond-helper (cdr branch-list)))))
              (macro cond (branch-list)
                  (cond-helper branch-list))
+             (fn length (input-list)
+                 (if (empty? input-list) 0 (+ 1 (length (cdr input-list)))))
+             (fn merge (input-list-1 input-list-2)
+                 (cond (((empty? input-list-1) input-list-2)
+                        ((empty? input-list-2) input-list-1)
+                        (else (let-list ((elem-1 (car input-list-1))
+                                         (elem-2 (car input-list-2)))
+                                  (if (< elem-1 elem-2)
+                                      (cons elem-1
+                                            (merge (cdr input-list-1) input-list-2))
+                                      (cons elem-2
+                                            (merge input-list-1 (cdr input-list-2)))))))))
+             (fn take (num input-list)
+                 (if (== num 0)
+                   (list)
+                   (cons (car input-list) (take (- num 1) (cdr input-list)))))
+             (fn drop (num input-list)
+                 (if (== num 0) input-list (drop (- num 1) (cdr input-list))))
+             (fn sort (input-list)
+                 (if (|| (empty? input-list) (== (length input-list) 1))
+                   input-list
+                   (let half-length (/ (length input-list) 2)
+                     (merge (sort (take half-length input-list))
+                            (sort (drop half-length input-list))))))
+             (sort (list 8 3 4 11 7 11 7)))
+            ",
+        )
+        .unwrap()
+        .parse_toplevel();
+
+        let result: Lit = evaluate(expand(program).unwrap()).unwrap();
+
+        assert_eq!(
+            result,
+            Lit::List(
+                vec![3, 4, 7, 7, 8, 11, 11]
+                    .iter()
+                    .map(|num: &i64| Lit::I64(*num))
+                    .collect()
+            )
+        );
+    }
+
+    // This variant uses macros inside macro definitions!
+    #[test]
+    fn test_expand_sort_complex() {
+        let program: Toplevel = tokenize(
+            "
+            ((fn pair-fst (input-list)
+                 (car (car input-list)))
+             (fn pair-snd (input-list)
+                 (car (cdr (car input-list))))
+             (fn cond-helper (branch-list)
+                  (if (== (pair-fst branch-list) (quote else))
+                      (pair-snd branch-list)
+                      (list (quote if) (pair-fst branch-list)
+                            (pair-snd branch-list)
+                            (cond-helper (cdr branch-list)))))
+             (macro cond (branch-list)
+                 (cond-helper branch-list))
+             (fn let-list-helper (bindings body)
+                 (cond (((empty? bindings) body)
+                        (else (list (quote let) (pair-fst bindings) (pair-snd bindings)
+                                   (let-list-helper (cdr bindings) body))))))
+             (macro let-list (bindings body)
+                 (cond (((== 0 0) (let-list-helper bindings body))
+                        (else (let-list-helper bindings body))))) 
              (fn length (input-list)
                  (if (empty? input-list) 0 (+ 1 (length (cdr input-list)))))
              (fn merge (input-list-1 input-list-2)
