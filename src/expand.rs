@@ -21,12 +21,6 @@ fn expand_expr(expr: AST, mut environment: Env) -> Result<AST, String> {
                             Ok(env?.insert(ident.to_owned(), AST::Lit(lit.to_owned())))
                         });
 
-                // This doesn't do anything! It'll be a bunch of lits, which we need to evaluate
-                // first!
-                //
-                // let expanded: AST = expand_expr(*body, environment.clone()?)?;
-
-                // We need to expand again here in case the evaluated thing contains any macros!
                 expand_expr(
                     evaluate_expr(dbg!(*body), environment.clone()?)
                         .map(|lit| lit.to_elem().parse())?,
