@@ -261,7 +261,7 @@ fn expand_top(forms: Vec<AST>, out_env: Env) -> Result<Vec<AST>, String> {
 }
 
 pub fn expand(Toplevel(forms): Toplevel) -> Result<Toplevel, String> {
-    Ok(Toplevel(expand_top(forms.to_owned(), Env::new())?))
+    Ok(Toplevel(expand_top(forms, Env::new())?))
 }
 
 #[cfg(test)]
