@@ -173,7 +173,7 @@ impl AST {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Env(HashMap<Ident, AST>);
 
 // This type is worked with immutably
