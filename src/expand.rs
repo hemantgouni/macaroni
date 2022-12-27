@@ -266,20 +266,6 @@ fn expand_top(forms: Vec<AST>, out_env: Env) -> Result<Vec<AST>, String> {
     }
 }
 
-fn _register_top(forms: Vec<AST>, mut environment: Env) -> Env {
-    match forms.as_slice() {
-        [func @ AST::Func(ident, _, _), rest @ ..] => _register_top(
-            rest.to_vec(),
-            environment.insert(ident.clone(), func.clone()),
-        ),
-        [mac @ AST::Macro(ident, _, _), rest @ ..] => _register_top(
-            rest.to_vec(),
-            environment.insert(ident.clone(), mac.clone()),
-        ),
-        [..] => environment,
-    }
-}
-
 pub fn expand(Toplevel(forms): Toplevel) -> Result<Toplevel, String> {
     Ok(Toplevel(expand_top(forms.to_owned(), Env::new())?))
 }
