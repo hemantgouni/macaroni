@@ -1,8 +1,8 @@
 Macaroni is a language for prototyping easy-to-use analysis-aware macros
 (without having to rely on things like elaborator programming). It currently
 implements a simple dynamically typed lisp-like language. Here's an example
-program that sorts a list-- this shows off most of the features of the
-language:
+program that sorts a list-- this shows off most of the (not very interesting)
+current features of the language:
 
 ```lisp
 ((fn pair-fst (input-list)
