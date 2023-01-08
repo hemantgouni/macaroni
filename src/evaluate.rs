@@ -151,6 +151,8 @@ pub fn evaluate_expr(program: AST, mut environment: Env) -> Result<Lit, String> 
             (Lit::Bool(bool1), Lit::Bool(bool2)) => Ok(Lit::Bool(bool1 == bool2)),
             (Lit::String(str1), Lit::String(str2)) => Ok(Lit::Bool(str1 == str2)),
             (Lit::Symbol(str1), Lit::Symbol(str2)) => Ok(Lit::Bool(str1 == str2)),
+            // TODO: Add a test case for this!!!!
+            (Lit::List(lit_vec1), Lit::List(lit_vec2)) => Ok(Lit::Bool(lit_vec1 == lit_vec2)),
             _ => Ok(Lit::Bool(false)),
         },
         AST::Lt(expr1, expr2) => match (
@@ -823,4 +825,61 @@ mod test {
 
         // assert_eq!(res, target);
     }
+
+    #[test]
+    fn test_eq_list() {
+        let result = evaluate(
+            tokenize(r#"((== (list 1 2 4 4) (list 1 2 4 4)))"#)
+                .unwrap()
+                .parse_toplevel(),
+        )
+        .unwrap();
+
+        let target: Lit = Lit::Bool(true);
+
+        assert_eq!(result, target);
+    }
+
+    #[test]
+    fn test_not_eq_list_1() {
+        let result = evaluate(
+            tokenize(r#"((== (list 1 2 3 4) (list 1 2 4 4)))"#)
+                .unwrap()
+                .parse_toplevel(),
+        )
+        .unwrap();
+
+        let target: Lit = Lit::Bool(false);
+
+        assert_eq!(result, target);
+    }
+
+    #[test]
+    fn test_not_eq_list_2() {
+        let result = evaluate(
+            tokenize(r#"((== (list 1 2 3 4) (list 1 2 3 4 1)))"#)
+                .unwrap()
+                .parse_toplevel(),
+        )
+        .unwrap();
+
+        let target: Lit = Lit::Bool(false);
+
+        assert_eq!(result, target);
+    }
+
+    #[test]
+    fn test_not_eq_list_4() {
+        let result = evaluate(
+            tokenize(r#"((== (list 1 2 3 4 1) (list 1 2 3 4)))"#)
+                .unwrap()
+                .parse_toplevel(),
+        )
+        .unwrap();
+
+        let target: Lit = Lit::Bool(false);
+
+        assert_eq!(result, target);
+    }
+
 }

@@ -16,24 +16,28 @@ fn expand_expr(expr: AST, mut environment: Env) -> Result<AST, String> {
                     binding_list
                         .iter()
                         .fold(Ok(environment.to_owned()), |env, (ident, lit)| {
-                            // We shouldn't expand the lit binding here, since the macro must receive
-                            // it as syntax, unmodified
+                            // We shouldn't expand the lit binding here, since the macro must
+                            // receive it as syntax, unmodified
                             Ok(env?.insert(ident.to_owned(), AST::Lit(lit.to_owned())))
                         });
 
+                // Evaluate the BODY of the macro we called first, to get back a literal form! Then
+                // parse the literal form into an AST and expand it.
+                //
+                // So if we have two nested macro calls, we'll first evaluate the outer one, then
+                // parse the returned lits
+                //
+                // And then call expand on any resulting macro calls?
+                //
+                // (Specifically, we need the call to expand here if there are ANY calls to
+                // non-built-in functions inside the body of some macro, since it'll be expanded to
+                // a MacroCall, which needs to be turned into a Call here-- so it matters even if
+                // there isn't another macro to be expanded in the body!)
+                //
+                // TODO: remove the enclosing expand and make sure this fails in the way we expect
+                // it to
                 expand_expr(
-                    // Evaluate the BODY first, to get back a literal form! Then parse the literal
-                    // form into an AST and expand it.
-                    //
-                    // So if we have two nested macro calls, we'll first evaluate the outer one,
-                    // then parse the returned lits
-                    //
-                    // And then call expand on any resulting macro calls?
-                    //
-                    // TODO: remove the enclosing expand and make sure this fails in the way we
-                    // expect it to
-                    dbg!(evaluate_expr(dbg!(*body), environment.clone()?))
-                        .map(|lit| lit.to_elem().parse())?,
+                    evaluate_expr(*body, environment.clone()?).map(|lit| lit.to_elem().parse())?,
                     environment?,
                 )
             }
