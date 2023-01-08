@@ -4,7 +4,7 @@ use crate::utils::concat;
 
 fn expand_expr(expr: AST, mut environment: Env) -> Result<AST, String> {
     match expr {
-        AST::MacroCall(ident, actual_args) => match dbg!(environment.clone()).lookup(&ident) {
+        AST::MacroCall(ident, actual_args) => match environment.clone().lookup(&ident) {
             Ok(AST::Macro(_, formal_args, body)) => {
                 let binding_list: Vec<(Ident, Lit)> = formal_args
                     .iter()
@@ -22,7 +22,17 @@ fn expand_expr(expr: AST, mut environment: Env) -> Result<AST, String> {
                         });
 
                 expand_expr(
-                    evaluate_expr(dbg!(*body), environment.clone()?)
+                    // Evaluate the BODY first, to get back a literal form! Then parse the literal
+                    // form into an AST and expand it.
+                    //
+                    // So if we have two nested macro calls, we'll first evaluate the outer one,
+                    // then parse the returned lits
+                    //
+                    // And then call expand on any resulting macro calls?
+                    //
+                    // TODO: remove the enclosing expand and make sure this fails in the way we
+                    // expect it to
+                    dbg!(evaluate_expr(dbg!(*body), environment.clone()?))
                         .map(|lit| lit.to_elem().parse())?,
                     environment?,
                 )
@@ -161,7 +171,7 @@ fn expand_expr(expr: AST, mut environment: Env) -> Result<AST, String> {
     }
 }
 
-fn expand_top(forms: Vec<AST>, out_env: Env) -> Result<Vec<AST>, String> {
+fn expand_top(forms: Vec<AST>, mut out_env: Env) -> Result<Vec<AST>, String> {
     match forms.as_slice() {
         [AST::Func(ident, args, body), rest @ ..] => {
             let rewrite_to_ident: fn(AST) -> AST = |ast: AST| match ast {
@@ -208,7 +218,7 @@ fn expand_top(forms: Vec<AST>, out_env: Env) -> Result<Vec<AST>, String> {
                 vec![expanded_func.to_owned()],
                 expand_top(
                     rest.to_vec(),
-                    dbg!(out_env).insert(ident.to_owned(), expanded_func),
+                    out_env.insert(ident.to_owned(), expanded_func),
                 )?,
             ))
         }
@@ -248,11 +258,11 @@ fn expand_top(forms: Vec<AST>, out_env: Env) -> Result<Vec<AST>, String> {
                 vec![expanded_func.to_owned()],
                 expand_top(
                     rest.to_vec(),
-                    dbg!(out_env).insert(ident.to_owned(), expanded_func),
+                    out_env.insert(ident.to_owned(), expanded_func),
                 )?,
             ))
         }
-        [expr, ..] => Ok(vec![expand_expr(expr.to_owned(), dbg!(out_env))?]),
+        [expr, ..] => Ok(vec![expand_expr(expr.to_owned(), out_env)?]),
         [] => Err(
             "expand_top either didn't find any top-level forms or a runnable expr. This is a bug!"
                 .to_string(),

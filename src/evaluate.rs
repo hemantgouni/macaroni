@@ -151,10 +151,7 @@ pub fn evaluate_expr(program: AST, mut environment: Env) -> Result<Lit, String> 
             (Lit::Bool(bool1), Lit::Bool(bool2)) => Ok(Lit::Bool(bool1 == bool2)),
             (Lit::String(str1), Lit::String(str2)) => Ok(Lit::Bool(str1 == str2)),
             (Lit::Symbol(str1), Lit::Symbol(str2)) => Ok(Lit::Bool(str1 == str2)),
-            other => {
-                dbg!(other);
-                Ok(Lit::Bool(false))
-            },
+            _ => Ok(Lit::Bool(false)),
         },
         AST::Lt(expr1, expr2) => match (
             evaluate_expr(*expr1, environment.to_owned())?,

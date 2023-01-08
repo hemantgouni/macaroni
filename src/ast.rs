@@ -332,7 +332,7 @@ mod test {
     #[should_panic]
     #[allow(unused_must_use)]
     fn test_from_14() {
-        dbg!(tokenize("(+ 1 1)").unwrap().parse_toplevel());
+        tokenize("(+ 1 1)").unwrap().parse_toplevel();
     }
 
     #[test]

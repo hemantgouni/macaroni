@@ -61,6 +61,10 @@ pub enum AST {
     Func(Ident, Vec<Ident>, Box<AST>),
     Macro(Ident, Vec<Ident>, Box<AST>),
     Call(Ident, Vec<AST>),
+    // Get rid of this and replace it with a rewrite node containing a Call node? Maybe?
+    //
+    // I mean if we wanted I think we could probably replace the entire thing with rewrites,
+    // but I do not think we should
     MacroCall(Ident, Vec<Lit>),
     Lit(Lit),
     Ident(Ident),

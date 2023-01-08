@@ -2,9 +2,9 @@ mod ast;
 mod data;
 mod evaluate;
 mod expand;
-mod fold;
 mod parse;
 mod utils;
+mod types;
 
 use std::{env, fs};
 
