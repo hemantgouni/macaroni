@@ -4,6 +4,7 @@ use crate::utils::concat;
 
 fn expand_expr(expr: AST, mut environment: Env) -> Result<AST, String> {
     match expr {
+        AST::Type(typ, expr) => Ok(AST::Type(typ, Box::new(expand_expr(*expr, environment)?))),
         AST::MacroCall(ident, actual_args) => match environment.clone().lookup(&ident) {
             Ok(AST::Macro(_, formal_args, body)) => {
                 let binding_list: Vec<(Ident, Lit)> = formal_args

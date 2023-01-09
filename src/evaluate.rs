@@ -24,6 +24,7 @@ pub fn evaluate_top(forms: Vec<AST>, mut environment: Env) -> Result<Lit, String
 
 pub fn evaluate_expr(program: AST, mut environment: Env) -> Result<Lit, String> {
     match program.clone() {
+        AST::Type(_, expr) => evaluate_expr(*expr, environment.to_owned()),
         AST::Call(ident, actual_args) => match environment.lookup(&ident) {
             Ok(AST::Func(_, formal_args, body)) => {
                 let environment: Result<Env, String> = formal_args
@@ -882,4 +883,17 @@ mod test {
         assert_eq!(result, target);
     }
 
+    #[test]
+    fn test_types_ignored() {
+        let result: Lit = evaluate(
+            tokenize("((: Int (+ (: Int 1) (: Int 1))))")
+                .unwrap()
+                .parse_toplevel(),
+        )
+        .unwrap();
+
+        let target: Lit = Lit::I64(2);
+
+        assert_eq!(result, target);
+    }
 }

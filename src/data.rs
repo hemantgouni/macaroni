@@ -1,3 +1,4 @@
+use crate::types::Type;
 use std::collections::HashMap;
 
 #[derive(Debug, Eq, PartialEq, Clone)]
@@ -58,6 +59,7 @@ impl Lit {
 
 #[derive(Debug, Eq, PartialEq, Clone)]
 pub enum AST {
+    Type(Type, Box<AST>),
     Func(Ident, Vec<Ident>, Box<AST>),
     Macro(Ident, Vec<Ident>, Box<AST>),
     Call(Ident, Vec<AST>),
@@ -93,6 +95,7 @@ pub enum AST {
 impl AST {
     pub fn rewrite(self) -> AST {
         match self {
+            AST::Type(typ, expr) => AST::Type(typ, Box::new(Self::rewrite(*expr))),
             AST::Func(name, args, body) => AST::Func(name, args, Box::new(Self::rewrite(*body))),
             AST::Macro(name, args, body) => AST::Macro(name, args, Box::new(Self::rewrite(*body))),
             AST::Call(name, args) => AST::Call(

@@ -1,4 +1,5 @@
 use crate::data::{Elem, Ident, Lit, Toplevel, AST};
+use crate::types::Type;
 
 fn quote_elem(elem: &Elem<String>) -> Lit {
     // Hey, this is basically the lexed representation of the code!!!!
@@ -6,6 +7,19 @@ fn quote_elem(elem: &Elem<String>) -> Lit {
         Elem::String(str) => Lit::String(str.to_string()),
         Elem::Symbol(str) => Lit::Symbol(str.to_string()),
         Elem::List(elems) => Lit::List(elems.iter().map(quote_elem).collect()),
+    }
+}
+
+fn parse_type(elem: &Elem<String>) -> Type {
+    match elem {
+        Elem::Symbol(str) if str == "Int" => Type::Int,
+        Elem::Symbol(str) if str == "Bool" => Type::Bool,
+        Elem::Symbol(str) if str == "String" => Type::String,
+        Elem::List(elems) => match elems.as_slice() {
+            [Elem::Symbol(str), typ] if str == "List" => Type::List(Box::new(parse_type(typ))),
+            other => panic!("Invalid type: {:?}", other),
+        },
+        other => panic!("Invalid type: {:?}", other),
     }
 }
 
@@ -25,6 +39,9 @@ impl Elem<String> {
                         .unwrap_or_else(|_| AST::Ident(Ident(str)))
                 }),
             Elem::List(elems) => match elems.as_slice() {
+                [Elem::Symbol(str), typ, expr] if str == ":" => {
+                    AST::Type(parse_type(typ), Box::new(expr.clone().parse()))
+                }
                 [Elem::Symbol(str), rest @ ..] if str == "list" => {
                     AST::List(rest.iter().map(|elem| elem.clone().parse()).collect())
                 }
