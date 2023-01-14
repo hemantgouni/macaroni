@@ -12,7 +12,7 @@ fn quote_elem(elem: &Elem<String>) -> Lit {
 
 fn parse_type(elem: &Elem<String>) -> Type {
     match elem {
-        Elem::Symbol(str) if str == "Int" => Type::Int,
+        Elem::Symbol(str) if str == "I64" => Type::I64,
         Elem::Symbol(str) if str == "Bool" => Type::Bool,
         Elem::Symbol(str) if str == "String" => Type::String,
         Elem::List(elems) => match elems.as_slice() {

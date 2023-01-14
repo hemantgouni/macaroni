@@ -886,7 +886,7 @@ mod test {
     #[test]
     fn test_types_ignored() {
         let result: Lit = evaluate(
-            tokenize("((: Int (+ (: Int 1) (: Int 1))))")
+            tokenize("((: I64 (+ (: I64 1) (: I64 1))))")
                 .unwrap()
                 .parse_toplevel(),
         )
