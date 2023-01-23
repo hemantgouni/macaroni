@@ -15,6 +15,7 @@ fn parse_type(elem: &Elem<String>) -> Type {
         Elem::Symbol(str) if str == "I64" => Type::I64,
         Elem::Symbol(str) if str == "Bool" => Type::Bool,
         Elem::Symbol(str) if str == "String" => Type::String,
+        Elem::Symbol(str) => Type::Var(str.to_string()),
         Elem::List(elems) => match elems.as_slice() {
             [Elem::Symbol(str), typ] if str == "List" => Type::List(Box::new(parse_type(typ))),
             other => panic!("Invalid type: {:?}", other),

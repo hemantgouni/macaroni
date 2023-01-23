@@ -1,8 +1,9 @@
 use crate::data::{Env, Lit, AST};
-use crate::utils::vec_all_eq;
+use crate::utils::{get_unique_id, vec_all_eq};
 
 #[derive(Debug, Eq, PartialEq, Clone)]
 pub enum Type {
+    Var(String),
     I64,
     Bool,
     String,
@@ -41,9 +42,19 @@ fn check_expr(expr: AST, current: Option<Type>, environment: Env) -> Result<(), 
                 ) {
                     (true, Some(typ)) => check_or_err(Type::List(Box::new(typ)), current_type),
                     (false, _) => Err(format!("Heterogeneous lists are not supported!")),
-                    // What do we do for this case?? How should we support polymorphism
-                    // (true, None) => ,
-                    _ => panic!(),
+                    // check_or_err needs to do unification, right?
+                    //
+                    // but List a should not unify with List b, necessarily, so this way of doing
+                    // it might be an issue
+                    (true, None) => check_or_err(
+                        // make sure type variables that start with numbers are syntactically
+                        // prohibited
+                        //
+                        // orr maybe we should have a special namespace for compiler generated type
+                        // variables!
+                        Type::List(Box::new(Type::Var(get_unique_id()))),
+                        current_type,
+                    ),
                 }
             }
         },
