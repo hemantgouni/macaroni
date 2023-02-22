@@ -58,6 +58,9 @@ fn check_expr(expr: AST, current: Option<Type>, environment: Env) -> Result<(), 
                 }
             }
         },
+        AST::Type(typ, expr) => check_expr(*expr, Some(typ), environment),
+        AST::Add(expr1, expr2) => check_expr(*expr1, Some(Type::I64), environment.clone())
+            .and_then(|_| check_expr(*expr2, Some(Type::I64), environment)),
         other => Err(format!("Type checking not yet implemented for {:?}", other)),
     }
 }
@@ -82,9 +85,37 @@ fn infer_expr(expr: AST, environment: Env) -> Result<Type, String> {
                 ((), ()) => Ok(Type::I64),
             }
         }
+        AST::Type(typ, _) => Ok(typ),
         other => Err(format!(
             "Type inference not yet implemented for {:?}",
             other
         )),
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    use crate::data::Env;
+    use crate::parse::tokenize;
+
+    #[test]
+    fn test_typecheck_simple() {
+        let ast = tokenize("(: I64 (+ (: I64 1) (: I64 1)))").unwrap().parse();
+
+        let result = check_expr(ast, None, Env::new()).unwrap();
+
+        assert_eq!(result, ())
+    }
+
+    #[test]
+    fn test_typecheck_simple_err() {
+        let ast = tokenize("(: I64 (+ (: I64 true) (: I64 1)))")
+            .unwrap()
+            .parse();
+
+        let result = check_expr(ast, None, Env::new()).unwrap_err();
+
+        assert_eq!(result, "Expected I64, given Bool")
     }
 }

@@ -1,0 +1,4 @@
+think about program-level type system
+
+it's okay if macros lie to each other? return type versus ask expansion for
+type?
