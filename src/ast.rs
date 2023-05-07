@@ -1,5 +1,5 @@
 use crate::data::{Elem, Ident, Lit, Toplevel, AST};
-use crate::types::Type;
+use crate::check::Type;
 
 fn quote_elem(elem: &Elem<String>) -> Lit {
     // Hey, this is basically the lexed representation of the code!!!!

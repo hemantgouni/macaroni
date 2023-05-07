@@ -4,7 +4,7 @@ mod evaluate;
 mod expand;
 mod parse;
 mod utils;
-mod types;
+mod check;
 
 use std::{env, fs};
 

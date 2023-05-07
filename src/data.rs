@@ -1,4 +1,4 @@
-use crate::types::Type;
+use crate::check::Type;
 use std::collections::HashMap;
 
 #[derive(Debug, Eq, PartialEq, Clone)]
@@ -84,11 +84,13 @@ pub enum AST {
     Lt(Box<AST>, Box<AST>),
     Gt(Box<AST>, Box<AST>),
     Concat(Box<AST>, Box<AST>),
+    // formulate this as a macro?
     Add(Box<AST>, Box<AST>),
     Div(Box<AST>, Box<AST>),
     Sub(Box<AST>, Box<AST>),
     Mult(Box<AST>, Box<AST>),
     Mod(Box<AST>, Box<AST>),
+    // use this to latently introduce typing information from macros?
     Rewrite(Box<AST>, fn(AST) -> AST),
 }
 
