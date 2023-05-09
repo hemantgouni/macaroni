@@ -119,7 +119,7 @@ fn expand_expr(expr: AST, mut environment: Env) -> Result<AST, String> {
         AST::Cdr(expr) => Ok(AST::Cdr(Box::new(expand_expr(*expr, environment.clone())?))),
         AST::Let(Ident(string), binding, expr) => {
             let rewrite_to_ident: fn(AST) -> AST = |ast: AST| match ast {
-                AST::Lit(Lit::Symbol(string)) => AST::Ident(Ident(string)),
+                AST::Lit(Lit::Symbol(string)) => AST::Var(Ident(string)),
                 _ => panic!("Ident rewrite lambda called on non-symbol: this is a bug!"),
             };
 
@@ -168,7 +168,7 @@ fn expand_expr(expr: AST, mut environment: Env) -> Result<AST, String> {
             environment.clone(),
         )?))),
         AST::Lit(lit) => Ok(AST::Lit(lit)),
-        AST::Ident(ident) => environment.lookup(&ident),
+        AST::Var(ident) => environment.lookup(&ident),
         other => Err(format!(
             "Macro expansion not yet implemented for {:?}",
             other
@@ -180,7 +180,7 @@ fn expand_top(forms: Vec<AST>, mut out_env: Env) -> Result<Vec<AST>, String> {
     match forms.as_slice() {
         [AST::Func(ident, args, body), rest @ ..] => {
             let rewrite_to_ident: fn(AST) -> AST = |ast: AST| match ast {
-                AST::Lit(Lit::Symbol(string)) => AST::Ident(Ident(string)),
+                AST::Lit(Lit::Symbol(string)) => AST::Var(Ident(string)),
                 _ => panic!("Ident rewrite lambda called on non-symbol: this is a bug!"),
             };
 
@@ -229,7 +229,7 @@ fn expand_top(forms: Vec<AST>, mut out_env: Env) -> Result<Vec<AST>, String> {
         }
         [AST::Macro(ident, args, body), rest @ ..] => {
             let rewrite_to_ident: fn(AST) -> AST = |ast: AST| match ast {
-                AST::Lit(Lit::Symbol(string)) => AST::Ident(Ident(string)),
+                AST::Lit(Lit::Symbol(string)) => AST::Var(Ident(string)),
                 _ => panic!("Ident rewrite lambda called on non-symbol: this is a bug!"),
             };
 

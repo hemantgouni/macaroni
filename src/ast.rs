@@ -37,7 +37,7 @@ impl Elem<String> {
                     str.to_string()
                         .parse::<bool>()
                         .map(|bool| AST::Lit(Lit::Bool(bool)))
-                        .unwrap_or_else(|_| AST::Ident(Ident(str)))
+                        .unwrap_or_else(|_| AST::Var(Ident(str)))
                 }),
             Elem::List(elems) => match elems.as_slice() {
                 [Elem::Symbol(str), typ, expr] if str == ":" => {
@@ -195,7 +195,7 @@ mod test {
             "a".into(),
             Box::new(AST::Lit(Lit::I64(4))),
             Box::new(AST::Add(
-                Box::new(AST::Ident("a".into())),
+                Box::new(AST::Var("a".into())),
                 Box::new(AST::Lit(Lit::I64(4))),
             )),
         );
@@ -271,7 +271,7 @@ mod test {
             vec!["num".into()],
             Box::new(AST::Add(
                 Box::new(AST::Lit(Lit::I64(1))),
-                Box::new(AST::Ident("num".into())),
+                Box::new(AST::Var("num".into())),
             )),
         )]);
         assert_eq!(res, target)
@@ -292,7 +292,7 @@ mod test {
                 "add1".into(),
                 vec!["num".into()],
                 Box::new(AST::Add(
-                    Box::new(AST::Ident("num".into())),
+                    Box::new(AST::Var("num".into())),
                     Box::new(AST::Lit(Lit::I64(1))),
                 )),
             ),
@@ -323,7 +323,7 @@ mod test {
                 "add1".into(),
                 vec!["num".into()],
                 Box::new(AST::Add(
-                    Box::new(AST::Ident("num".into())),
+                    Box::new(AST::Var("num".into())),
                     Box::new(AST::Lit(Lit::I64(1))),
                 )),
             ),
@@ -382,7 +382,7 @@ mod test {
                 "add1".into(),
                 vec!["num".into()],
                 Box::new(AST::Add(
-                    Box::new(AST::Ident("num".into())),
+                    Box::new(AST::Var("num".into())),
                     Box::new(AST::Lit(Lit::I64(1))),
                 )),
             ),

@@ -69,7 +69,7 @@ pub enum AST {
     // but I do not think we should
     MacroCall(Ident, Vec<Lit>),
     Lit(Lit),
-    Ident(Ident),
+    Var(Ident),
     Eval(Box<AST>),
     List(Vec<AST>),
     Cons(Box<AST>, Box<AST>),
@@ -108,7 +108,7 @@ impl AST {
             ),
             AST::MacroCall(name, args) => AST::MacroCall(name, args),
             AST::Lit(lit) => AST::Lit(lit),
-            AST::Ident(ident) => AST::Ident(ident),
+            AST::Var(ident) => AST::Var(ident),
             AST::Eval(expr) => AST::Eval(Box::new(Self::rewrite(*expr))),
             AST::List(exprs) => AST::List(
                 exprs

@@ -197,7 +197,7 @@ pub fn evaluate_expr(program: AST, mut environment: Env) -> Result<Lit, String> 
             (Lit::String(str1), Lit::String(str2)) => Ok(Lit::String(str1 + &str2)),
             other => Err(format!("Non-string arguments given to ++: {:?}", other)),
         },
-        AST::Ident(ident) => environment
+        AST::Var(ident) => environment
             .lookup(&ident)
             .map(|expr| evaluate_expr(expr, environment))?,
         AST::Eval(expr) => {
