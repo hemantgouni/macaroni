@@ -11,7 +11,7 @@ pub enum Type {
     String,
     Symbol,
     List(Box<Type>),
-    Func(Box<Type>, Box<Type>),
+    Func(Vec<Type>, Box<Type>),
 }
 
 impl PartialEq for Type {
@@ -65,7 +65,7 @@ fn infer_lit(expr: Lit) -> Result<Type, TypeError> {
     }
 }
 
-fn infer_expr(expr: AST, environment: Env) -> Result<Type, TypeError> {
+fn infer_expr(expr: AST, environment: Env<Type>) -> Result<Type, TypeError> {
     match expr {
         AST::Lit(lit) => infer_lit(lit),
         AST::Type(ref ty, expr) => match check_expr(*expr, environment, ty.clone()) {
@@ -85,12 +85,48 @@ fn infer_expr(expr: AST, environment: Env) -> Result<Type, TypeError> {
                 (Err(tyerr), _) | (_, Err(tyerr)) => Err(tyerr),
             }
         }
+        // TODO: Figure out a more sensible error message here, make the TypeError type able to
+        // handle this
+        //
+        // Or maybe make a more generic error trait that has a .message method or something, since
+        // a variable lookup failure isn't really a type error!
+        AST::Var(ident) => environment.lookup(&ident).map_err(|_| TypeError {
+            expected: Type::Bottom,
+            given: Type::Bottom,
+        }),
         _ => todo!(),
     }
 }
 
-fn check_expr(expr: AST, environment: Env, expected: Type) -> Result<(), TypeError> {
+fn check_expr(expr: AST, mut environment: Env<Type>, expected: Type) -> Result<(), TypeError> {
     match expr {
+        // prevent shadowing with different type, maybe?
+        AST::Let(name, binding, body) => {
+            let binding_type = infer_expr(*binding, environment.clone())?;
+            check_expr(*body, environment.insert(name, binding_type), expected)
+        }
+        // this is a top level form so we should probably register the name somewhere? or are we
+        // assuming it's already registered as such?
+        AST::Func(name, args, body) => match expected {
+            Type::Func(arg_types, body_type) => {
+                let args_env: Env<Type> =
+                    args.iter()
+                        .zip(arg_types.iter())
+                        .fold(environment, |mut env, arg_and_type| {
+                            env.insert(arg_and_type.0.clone(), arg_and_type.1.clone())
+                        });
+
+                check_expr(*body, args_env, *body_type)
+            }
+            // TODO: Another place where the TypeError type needs to be extended (or this needs to
+            // be generalized into a trait) to handle more kinds of type checking failure cases
+            other => Err(TypeError {
+                expected: Type::Func(Vec::new(), Box::new(Type::Bottom)),
+                given: other,
+            }),
+        },
+        // We can call this with Type::Bottom to start type checking if the top level
+        // expr is unannotated? Since Bottom is equal to any other type
         _ => match infer_expr(expr, environment) {
             Ok(given) => {
                 if given == expected {
@@ -181,5 +217,33 @@ mod test {
         let result = infer_lit(lit);
 
         assert_eq!(result, Ok(Type::List(Box::new(Type::I64))))
+    }
+
+    #[test]
+    fn typecheck_let() {
+        let ast = tokenize("(let var1 2 (let var2 9 (+ var1 var2)))")
+            .unwrap()
+            .parse();
+
+        let result = check_expr(ast, Env::new(), Type::I64);
+
+        assert_eq!(result, Ok(()));
+    }
+
+    #[test]
+    fn typecheck_let_err() {
+        let ast = tokenize(r#"(let var1 2 (let var2 "hello" (+ var1 var2)))"#)
+            .unwrap()
+            .parse();
+
+        let result = check_expr(ast, Env::new(), Type::I64).unwrap_err();
+
+        assert_eq!(
+            result,
+            TypeError {
+                expected: Type::I64,
+                given: Type::String
+            }
+        )
     }
 }

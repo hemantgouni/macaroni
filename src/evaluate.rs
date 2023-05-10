@@ -4,7 +4,7 @@ pub fn evaluate(Toplevel(forms): Toplevel) -> Result<Lit, String> {
     evaluate_top(forms, Env::new())
 }
 
-pub fn evaluate_top(forms: Vec<AST>, mut environment: Env) -> Result<Lit, String> {
+pub fn evaluate_top(forms: Vec<AST>, mut environment: Env<AST>) -> Result<Lit, String> {
     match forms.as_slice() {
         [func @ AST::Func(ident, _, _), rest @ ..] => evaluate_top(
             rest.to_vec(),
@@ -22,12 +22,12 @@ pub fn evaluate_top(forms: Vec<AST>, mut environment: Env) -> Result<Lit, String
     }
 }
 
-pub fn evaluate_expr(program: AST, mut environment: Env) -> Result<Lit, String> {
+pub fn evaluate_expr(program: AST, mut environment: Env<AST>) -> Result<Lit, String> {
     match program.clone() {
         AST::Type(_, expr) => evaluate_expr(*expr, environment.to_owned()),
         AST::Call(ident, actual_args) => match environment.lookup(&ident) {
             Ok(AST::Func(_, formal_args, body)) => {
-                let environment: Result<Env, String> = formal_args
+                let environment: Result<Env<AST>, String> = formal_args
                     .iter()
                     .zip(actual_args.iter())
                     .fold(Ok(environment.to_owned()), |env, (ident, ast)| {

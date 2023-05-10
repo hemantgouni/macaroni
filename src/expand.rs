@@ -2,7 +2,7 @@ use crate::data::{Env, Ident, Lit, Toplevel, AST};
 use crate::evaluate::evaluate_expr;
 use crate::utils::concat;
 
-fn expand_expr(expr: AST, mut environment: Env) -> Result<AST, String> {
+fn expand_expr(expr: AST, mut environment: Env<AST>) -> Result<AST, String> {
     match expr {
         AST::Type(typ, expr) => Ok(AST::Type(typ, Box::new(expand_expr(*expr, environment)?))),
         AST::MacroCall(ident, actual_args) => match environment.clone().lookup(&ident) {
@@ -13,7 +13,7 @@ fn expand_expr(expr: AST, mut environment: Env) -> Result<AST, String> {
                     .zip(actual_args)
                     .collect();
 
-                let environment: Result<Env, String> =
+                let environment: Result<Env<AST>, String> =
                     binding_list
                         .iter()
                         .fold(Ok(environment.to_owned()), |env, (ident, lit)| {
@@ -176,7 +176,7 @@ fn expand_expr(expr: AST, mut environment: Env) -> Result<AST, String> {
     }
 }
 
-fn expand_top(forms: Vec<AST>, mut out_env: Env) -> Result<Vec<AST>, String> {
+fn expand_top(forms: Vec<AST>, mut out_env: Env<AST>) -> Result<Vec<AST>, String> {
     match forms.as_slice() {
         [AST::Func(ident, args, body), rest @ ..] => {
             let rewrite_to_ident: fn(AST) -> AST = |ast: AST| match ast {
@@ -197,9 +197,9 @@ fn expand_top(forms: Vec<AST>, mut out_env: Env) -> Result<Vec<AST>, String> {
                 })
                 .collect();
 
-            let mut bind_env: Env = binding_list.iter().fold(
+            let mut bind_env: Env<AST> = binding_list.iter().fold(
                 Ok(out_env.to_owned()),
-                |env: Result<Env, String>, (ident, ast)| {
+                |env: Result<Env<AST>, String>, (ident, ast)| {
                     Ok(env?.insert(ident.to_owned(), ast.to_owned()))
                 },
             )?;
@@ -246,9 +246,9 @@ fn expand_top(forms: Vec<AST>, mut out_env: Env) -> Result<Vec<AST>, String> {
                 })
                 .collect();
 
-            let bind_env: Env = binding_list.iter().fold(
+            let bind_env: Env<AST> = binding_list.iter().fold(
                 Ok(out_env.to_owned()),
-                |env: Result<Env, String>, (ident, ast)| {
+                |env: Result<Env<AST>, String>, (ident, ast)| {
                     Ok(env?.insert(ident.to_owned(), ast.to_owned()))
                 },
             )?;

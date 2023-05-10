@@ -61,12 +61,8 @@ impl Lit {
 pub enum AST {
     Type(Type, Box<AST>),
     Func(Ident, Vec<Ident>, Box<AST>),
-    Macro(Ident, Vec<Ident>, Box<AST>),
     Call(Ident, Vec<AST>),
-    // Get rid of this and replace it with a rewrite node containing a Call node? Maybe?
-    //
-    // I mean if we wanted I think we could probably replace the entire thing with rewrites,
-    // but I do not think we should
+    Macro(Ident, Vec<Ident>, Box<AST>),
     MacroCall(Ident, Vec<Lit>),
     Lit(Lit),
     Var(Ident),
@@ -183,24 +179,24 @@ impl AST {
 }
 
 #[derive(Clone, Debug)]
-pub struct Env(HashMap<Ident, AST>);
+pub struct Env<A>(HashMap<Ident, A>);
 
 // This type is worked with immutably
-impl Env {
+impl<A: Clone> Env<A> {
     pub fn new() -> Self {
         Env(HashMap::new())
     }
 
-    pub fn insert(&mut self, ident: Ident, ast: AST) -> Self {
+    pub fn insert(&mut self, ident: Ident, elem: A) -> Self {
         match self {
             Env(map) => {
-                map.insert(ident, ast);
+                map.insert(ident, elem);
                 Env(map.clone())
             }
         }
     }
 
-    pub fn lookup(&mut self, ident: &Ident) -> Result<AST, String> {
+    pub fn lookup(&self, ident: &Ident) -> Result<A, String> {
         match self {
             Env(map) => map
                 .get(ident)
