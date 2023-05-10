@@ -1,6 +1,6 @@
 #![allow(dead_code)]
 
-use crate::data::{Env, Lit, AST};
+use crate::data::{Env, Ident, Lit, Toplevel, AST};
 
 #[derive(Debug, Eq, Clone)]
 pub enum Type {
@@ -94,6 +94,37 @@ fn infer_expr(expr: AST, environment: Env<Type>) -> Result<Type, TypeError> {
             expected: Type::Bottom,
             given: Type::Bottom,
         }),
+        AST::Call(name, args) => {
+            let func_sig = environment.lookup(&name).map_err(|_| TypeError {
+                expected: Type::Bottom,
+                given: Type::Bottom,
+            })?;
+            match func_sig.clone() {
+                Type::Func(arg_types, res_type) => {
+                    if args
+                        .iter()
+                        .zip(arg_types.iter())
+                        .all(|(arg, expected_type)| {
+                            matches!(
+                                check_expr(arg.clone(), environment.clone(), expected_type.clone()),
+                                Ok(())
+                            )
+                        })
+                    {
+                        Ok(*res_type)
+                    } else {
+                        Err(TypeError {
+                            expected: Type::Bottom,
+                            given: Type::Bottom,
+                        })
+                    }
+                }
+                other => Err(TypeError {
+                    expected: Type::Func(vec![Type::Bottom], Box::new(Type::Bottom)),
+                    given: other,
+                }),
+            }
+        }
         _ => todo!(),
     }
 }
@@ -127,6 +158,8 @@ fn check_expr(expr: AST, mut environment: Env<Type>, expected: Type) -> Result<(
         },
         // We can call this with Type::Bottom to start type checking if the top level
         // expr is unannotated? Since Bottom is equal to any other type
+        //
+        // the subsumption rule is here
         _ => match infer_expr(expr, environment) {
             Ok(given) => {
                 if given == expected {
@@ -245,5 +278,23 @@ mod test {
                 given: Type::String
             }
         )
+    }
+
+    #[test]
+    fn typecheck_func() {
+        let Toplevel(ast) = tokenize(
+            r#"((fn add (operand1 operand2)
+                (+ operand1 operand2)))"#,
+        )
+        .unwrap()
+        .parse_toplevel();
+
+        let result = check_expr(
+            ast.iter().next().unwrap().to_owned(),
+            Env::new(),
+            Type::Func(vec![Type::I64, Type::I64], Box::new(Type::I64)),
+        );
+
+        assert_eq!(result, Ok(()))
     }
 }
