@@ -1,6 +1,7 @@
 #![allow(dead_code)]
 
 use crate::data::{Env, Ident, Lit, Toplevel, AST};
+use crate::expand::expand;
 
 #[derive(Debug, Eq, Clone)]
 pub enum Type {
@@ -99,6 +100,7 @@ fn infer_expr(expr: AST, environment: Env<Type>) -> Result<Type, TypeError> {
                 expected: Type::Bottom,
                 given: Type::Bottom,
             })?;
+
             match func_sig.clone() {
                 Type::Func(arg_types, res_type) => {
                     if args
@@ -125,7 +127,7 @@ fn infer_expr(expr: AST, environment: Env<Type>) -> Result<Type, TypeError> {
                 }),
             }
         }
-        _ => todo!(),
+        other => todo!("{:?}", other),
     }
 }
 
@@ -146,7 +148,6 @@ fn check_expr(expr: AST, mut environment: Env<Type>, expected: Type) -> Result<(
                         .fold(environment, |mut env, arg_and_type| {
                             env.insert(arg_and_type.0.clone(), arg_and_type.1.clone())
                         });
-
                 check_expr(*body, args_env, *body_type)
             }
             // TODO: Another place where the TypeError type needs to be extended (or this needs to
@@ -170,6 +171,25 @@ fn check_expr(expr: AST, mut environment: Env<Type>, expected: Type) -> Result<(
             }
             Err(tyerr) => Err(tyerr),
         },
+    }
+}
+
+// rename environment -> env
+// improve error handling with a TypeError trait? Or something
+// actually, use an enum
+
+fn check_top(exprs: Vec<AST>, mut env: Env<Type>) -> Result<(), TypeError> {
+    match exprs.as_slice() {
+        [AST::TypeDec(name, func_type), rest @ ..] => check_top(
+            rest.to_vec(),
+            env.insert(name.to_owned(), func_type.to_owned()),
+        ),
+        [AST::Func(..) | AST::Macro(..), rest @ ..] => check_top(rest.to_vec(), env.to_owned()),
+        [expr] => check_expr(expr.to_owned(), env, Type::Bottom),
+        _ => Err(TypeError {
+            expected: Type::Bottom,
+            given: Type::Bottom,
+        }),
     }
 }
 
@@ -294,6 +314,25 @@ mod test {
             Env::new(),
             Type::Func(vec![Type::I64, Type::I64], Box::new(Type::I64)),
         );
+
+        assert_eq!(result, Ok(()))
+    }
+
+    #[test]
+    fn typecheck_call() {
+        let Toplevel(ast) = expand(
+            tokenize(
+                r#"((declare add (-> (I64 I64) I64))
+                    (fn add (operand1 operand2)
+                      (+ operand1 operand2))
+                    (: I64 (add 1 4)))"#,
+            )
+            .unwrap()
+            .parse_toplevel(),
+        )
+        .unwrap();
+
+        let result = check_top(ast, Env::new());
 
         assert_eq!(result, Ok(()))
     }

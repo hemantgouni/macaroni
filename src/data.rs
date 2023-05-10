@@ -60,6 +60,7 @@ impl Lit {
 #[derive(Debug, Eq, PartialEq, Clone)]
 pub enum AST {
     Type(Type, Box<AST>),
+    TypeDec(Ident, Type),
     Func(Ident, Vec<Ident>, Box<AST>),
     Call(Ident, Vec<AST>),
     Macro(Ident, Vec<Ident>, Box<AST>),
@@ -94,6 +95,7 @@ impl AST {
     pub fn rewrite(self) -> AST {
         match self {
             AST::Type(typ, expr) => AST::Type(typ, Box::new(Self::rewrite(*expr))),
+            AST::TypeDec(ident, typ) => AST::TypeDec(ident, typ),
             AST::Func(name, args, body) => AST::Func(name, args, Box::new(Self::rewrite(*body))),
             AST::Macro(name, args, body) => AST::Macro(name, args, Box::new(Self::rewrite(*body))),
             AST::Call(name, args) => AST::Call(

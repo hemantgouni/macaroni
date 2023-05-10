@@ -1,5 +1,5 @@
-use crate::data::{Elem, Ident, Lit, Toplevel, AST};
 use crate::check::Type;
+use crate::data::{Elem, Ident, Lit, Toplevel, AST};
 
 fn quote_elem(elem: &Elem<String>) -> Lit {
     // Hey, this is basically the lexed representation of the code!!!!
@@ -18,6 +18,10 @@ fn parse_type(elem: &Elem<String>) -> Type {
         Elem::Symbol(str) => Type::Var(str.to_string()),
         Elem::List(elems) => match elems.as_slice() {
             [Elem::Symbol(str), typ] if str == "List" => Type::List(Box::new(parse_type(typ))),
+            [Elem::Symbol(str), Elem::List(arg_types), body_type] if str == "->" => Type::Func(
+                arg_types.iter().map(parse_type).collect(),
+                Box::new(parse_type(body_type)),
+            ),
             other => panic!("Invalid type: {:?}", other),
         },
         other => panic!("Invalid type: {:?}", other),
@@ -134,6 +138,9 @@ impl Elem<String> {
                     .iter()
                     .map(|elem| match elem {
                         Elem::List(toplevel_form) => match toplevel_form.as_slice() {
+                            [Elem::Symbol(str), Elem::Symbol(ident), typ] if str == "declare" => {
+                                AST::TypeDec((*ident).as_str().into(), parse_type(typ))
+                            }
                             [Elem::Symbol(str), Elem::Symbol(ident), Elem::List(args), body]
                                 if str == "fn" =>
                             {

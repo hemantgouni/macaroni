@@ -2,6 +2,8 @@ use crate::data::{Env, Ident, Lit, Toplevel, AST};
 use crate::evaluate::evaluate_expr;
 use crate::utils::concat;
 
+use crate::check::Type;
+
 fn expand_expr(expr: AST, mut environment: Env<AST>) -> Result<AST, String> {
     match expr {
         AST::Type(typ, expr) => Ok(AST::Type(typ, Box::new(expand_expr(*expr, environment)?))),
@@ -267,6 +269,10 @@ fn expand_top(forms: Vec<AST>, mut out_env: Env<AST>) -> Result<Vec<AST>, String
                 )?,
             ))
         }
+        [func_type_dec @ AST::TypeDec(.., Type::Func(..)), rest @ ..] => Ok(concat(
+            vec![func_type_dec.to_owned()],
+            expand_top(rest.to_vec(), out_env)?,
+        )),
         [expr, ..] => Ok(vec![expand_expr(expr.to_owned(), out_env)?]),
         [] => Err(
             "expand_top either didn't find any top-level forms or a runnable expr. This is a bug!"
