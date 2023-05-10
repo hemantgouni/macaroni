@@ -16,18 +16,18 @@ pub enum Type {
 
 impl PartialEq for Type {
     fn eq(&self, other: &Type) -> bool {
-        match (self, other) {
-            (Type::Bottom, _) => true,
-            (_, Type::Bottom) => true,
-            (Type::Var(..), Type::Var(..)) => true,
-            (Type::I64, Type::I64) => true,
-            (Type::Bool, Type::Bool) => true,
-            (Type::String, Type::String) => true,
-            (Type::Symbol, Type::Symbol) => true,
-            (Type::List(..), Type::List(..)) => true,
-            (Type::Func(..), Type::Func(..)) => true,
-            _ => false,
-        }
+        matches!(
+            (self, other),
+            (Type::Bottom, _)
+                | (_, Type::Bottom)
+                | (Type::Var(..), Type::Var(..))
+                | (Type::I64, Type::I64)
+                | (Type::Bool, Type::Bool)
+                | (Type::String, Type::String)
+                | (Type::Symbol, Type::Symbol)
+                | (Type::List(..), Type::List(..))
+                | (Type::Func(..), Type::Func(..))
+        )
     }
 }
 
@@ -92,14 +92,11 @@ fn infer_expr(expr: AST, environment: Env) -> Result<Type, TypeError> {
 fn check_expr(expr: AST, environment: Env, expected: Type) -> Result<(), TypeError> {
     match expr {
         _ => match infer_expr(expr, environment) {
-            Ok(ty) => {
-                if ty == expected {
+            Ok(given) => {
+                if given == expected {
                     Ok(())
                 } else {
-                    Err(TypeError {
-                        expected,
-                        given: ty,
-                    })
+                    Err(TypeError { expected, given })
                 }
             }
             Err(tyerr) => Err(tyerr),
