@@ -33,16 +33,22 @@ impl PartialEq for Type {
 }
 
 #[derive(Debug, PartialEq)]
-struct TypeError {
-    expected: Type,
-    given: Type,
+struct Expected(Type);
+
+#[derive(Debug, PartialEq)]
+struct Given(Type);
+
+#[derive(Debug, PartialEq)]
+enum TypeError {
+    Mismatch(Expected, Given),
+    LookupFailure(Ident),
 }
 
 fn type_eq_or_err(given: Type, expected: Type) -> Result<(), TypeError> {
     if expected == given {
         Ok(())
     } else {
-        Err(TypeError { expected, given })
+        Err(TypeError::Mismatch(Expected(expected), Given(given)))
     }
 }
 
@@ -55,10 +61,10 @@ fn infer_lit(expr: Lit) -> Result<Type, TypeError> {
         Lit::List(lits) => lits
             .iter()
             .fold(Ok(Type::Bottom), |prev, next| match prev {
-                Ok(ty) if ty != infer_lit(next.clone())? => Err(TypeError {
-                    expected: ty,
-                    given: infer_lit(next.clone())?,
-                }),
+                Ok(ty) if ty != infer_lit(next.clone())? => Err(TypeError::Mismatch(
+                    Expected(ty),
+                    Given(infer_lit(next.clone())?),
+                )),
                 Ok(_) => Ok(infer_lit(next.clone())?),
                 Err(_) => prev,
             })
@@ -66,10 +72,10 @@ fn infer_lit(expr: Lit) -> Result<Type, TypeError> {
     }
 }
 
-fn infer_expr(expr: AST, environment: Env<Type>) -> Result<Type, TypeError> {
+fn infer_expr(expr: AST, env: Env<Type>) -> Result<Type, TypeError> {
     match expr {
         AST::Lit(lit) => infer_lit(lit),
-        AST::Type(ref ty, expr) => match check_expr(*expr, environment, ty.clone()) {
+        AST::Type(ref ty, expr) => match check_expr(*expr, env, ty.clone()) {
             Ok(()) => Ok(ty.clone()),
             Err(tyerr) => Err(tyerr),
         },
@@ -78,8 +84,8 @@ fn infer_expr(expr: AST, environment: Env<Type>) -> Result<Type, TypeError> {
         | AST::Sub(expr1, expr2)
         | AST::Div(expr1, expr2) => {
             match (
-                check_expr(*expr1, environment.clone(), Type::I64),
-                check_expr(*expr2, environment, Type::I64),
+                check_expr(*expr1, env.clone(), Type::I64),
+                check_expr(*expr2, env, Type::I64),
             ) {
                 (Ok(_), Ok(_)) => Ok(Type::I64),
                 // TODO: Need to figure out a way to merge errors
@@ -91,15 +97,13 @@ fn infer_expr(expr: AST, environment: Env<Type>) -> Result<Type, TypeError> {
         //
         // Or maybe make a more generic error trait that has a .message method or something, since
         // a variable lookup failure isn't really a type error!
-        AST::Var(ident) => environment.lookup(&ident).map_err(|_| TypeError {
-            expected: Type::Bottom,
-            given: Type::Bottom,
-        }),
+        AST::Var(ident) => env
+            .lookup(&ident)
+            .map_err(|_| TypeError::LookupFailure(ident)),
         AST::Call(name, args) => {
-            let func_sig = environment.lookup(&name).map_err(|_| TypeError {
-                expected: Type::Bottom,
-                given: Type::Bottom,
-            })?;
+            let func_sig = env
+                .lookup(&name)
+                .map_err(|_| TypeError::LookupFailure(name))?;
 
             match func_sig.clone() {
                 Type::Func(arg_types, res_type) => {
@@ -108,75 +112,71 @@ fn infer_expr(expr: AST, environment: Env<Type>) -> Result<Type, TypeError> {
                         .zip(arg_types.iter())
                         .all(|(arg, expected_type)| {
                             matches!(
-                                check_expr(arg.clone(), environment.clone(), expected_type.clone()),
+                                check_expr(arg.clone(), env.clone(), expected_type.clone()),
                                 Ok(())
                             )
                         })
                     {
                         Ok(*res_type)
                     } else {
-                        Err(TypeError {
-                            expected: Type::Bottom,
-                            given: Type::Bottom,
-                        })
+                        Err(TypeError::Mismatch(
+                            Expected(Type::Bottom),
+                            Given(Type::Bottom),
+                        ))
                     }
                 }
-                other => Err(TypeError {
-                    expected: Type::Func(vec![Type::Bottom], Box::new(Type::Bottom)),
-                    given: other,
-                }),
+                other => Err(TypeError::Mismatch(
+                    Expected(Type::Func(vec![Type::Bottom], Box::new(Type::Bottom))),
+                    Given(other),
+                )),
             }
         }
         other => todo!("{:?}", other),
     }
 }
 
-fn check_expr(expr: AST, mut environment: Env<Type>, expected: Type) -> Result<(), TypeError> {
+fn check_expr(expr: AST, mut env: Env<Type>, expected: Type) -> Result<(), TypeError> {
     match expr {
         // prevent shadowing with different type, maybe?
         AST::Let(name, binding, body) => {
-            let binding_type = infer_expr(*binding, environment.clone())?;
-            check_expr(*body, environment.insert(name, binding_type), expected)
+            let binding_type = infer_expr(*binding, env.clone())?;
+            check_expr(*body, env.insert(name, binding_type), expected)
         }
         // this is a top level form so we should probably register the name somewhere? or are we
         // assuming it's already registered as such?
-        AST::Func(name, args, body) => match expected {
+        AST::Func(_, args, body) => match expected {
             Type::Func(arg_types, body_type) => {
                 let args_env: Env<Type> =
                     args.iter()
                         .zip(arg_types.iter())
-                        .fold(environment, |mut env, arg_and_type| {
+                        .fold(env, |mut env, arg_and_type| {
                             env.insert(arg_and_type.0.clone(), arg_and_type.1.clone())
                         });
                 check_expr(*body, args_env, *body_type)
             }
             // TODO: Another place where the TypeError type needs to be extended (or this needs to
             // be generalized into a trait) to handle more kinds of type checking failure cases
-            other => Err(TypeError {
-                expected: Type::Func(Vec::new(), Box::new(Type::Bottom)),
-                given: other,
-            }),
+            other => Err(TypeError::Mismatch(
+                Expected(Type::Func(Vec::new(), Box::new(Type::Bottom))),
+                Given(other),
+            )),
         },
         // We can call this with Type::Bottom to start type checking if the top level
         // expr is unannotated? Since Bottom is equal to any other type
         //
         // the subsumption rule is here
-        _ => match infer_expr(expr, environment) {
+        _ => match infer_expr(expr, env) {
             Ok(given) => {
                 if given == expected {
                     Ok(())
                 } else {
-                    Err(TypeError { expected, given })
+                    Err(TypeError::Mismatch(Expected(expected), Given(given)))
                 }
             }
             Err(tyerr) => Err(tyerr),
         },
     }
 }
-
-// rename environment -> env
-// improve error handling with a TypeError trait? Or something
-// actually, use an enum
 
 fn check_top(exprs: Vec<AST>, mut env: Env<Type>) -> Result<(), TypeError> {
     match exprs.as_slice() {
@@ -186,10 +186,10 @@ fn check_top(exprs: Vec<AST>, mut env: Env<Type>) -> Result<(), TypeError> {
         ),
         [AST::Func(..) | AST::Macro(..), rest @ ..] => check_top(rest.to_vec(), env.to_owned()),
         [expr] => check_expr(expr.to_owned(), env, Type::Bottom),
-        _ => Err(TypeError {
-            expected: Type::Bottom,
-            given: Type::Bottom,
-        }),
+        _ => Err(TypeError::Mismatch(
+            Expected(Type::Bottom),
+            Given(Type::Bottom),
+        )),
     }
 }
 
@@ -218,10 +218,7 @@ mod test {
 
         assert_eq!(
             result,
-            TypeError {
-                expected: Type::I64,
-                given: Type::Bool
-            }
+            TypeError::Mismatch(Expected(Type::I64), Given(Type::Bool)),
         )
     }
 
@@ -247,10 +244,7 @@ mod test {
 
         assert_eq!(
             result,
-            TypeError {
-                expected: Type::I64,
-                given: Type::String,
-            }
+            TypeError::Mismatch(Expected(Type::I64), Given(Type::String)),
         )
     }
 
@@ -293,10 +287,7 @@ mod test {
 
         assert_eq!(
             result,
-            TypeError {
-                expected: Type::I64,
-                given: Type::String
-            }
+            TypeError::Mismatch(Expected(Type::I64), Given(Type::String)),
         )
     }
 
