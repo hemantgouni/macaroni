@@ -4,7 +4,7 @@ use crate::utils::concat;
 
 use crate::check::Type;
 
-fn expand_expr(expr: AST, mut environment: Env<AST>) -> Result<AST, String> {
+fn expand_expr(expr: AST, environment: Env<AST>) -> Result<AST, String> {
     match expr {
         AST::Type(typ, expr) => Ok(AST::Type(typ, Box::new(expand_expr(*expr, environment)?))),
         AST::Lambda(args, body) => {
@@ -12,7 +12,7 @@ fn expand_expr(expr: AST, mut environment: Env<AST>) -> Result<AST, String> {
             // better way?
             Ok(AST::Lambda(args, Box::new(expand_expr(*body, environment)?)).rewrite())
         }
-        AST::MacroCall(ident, actual_args) => match environment.clone().lookup(&ident) {
+        AST::MacroCall(ident, actual_args) => match environment.lookup(&ident) {
             Ok(AST::Macro(_, formal_args, body)) => {
                 let binding_list: Vec<(Ident, Lit)> = formal_args
                     .iter()
@@ -23,7 +23,7 @@ fn expand_expr(expr: AST, mut environment: Env<AST>) -> Result<AST, String> {
                 let environment: Result<Env<AST>, String> =
                     binding_list
                         .iter()
-                        .fold(Ok(environment.to_owned()), |env, (ident, lit)| {
+                        .fold(Ok(environment), |env, (ident, lit)| {
                             // We shouldn't expand the lit binding here, since the macro must
                             // receive it as syntax, unmodified
                             Ok(env?.insert(ident.to_owned(), AST::Lit(lit.to_owned())))
@@ -96,34 +96,34 @@ fn expand_expr(expr: AST, mut environment: Env<AST>) -> Result<AST, String> {
         })),
         AST::Add(expr1, expr2) => Ok(AST::Add(
             Box::new(expand_expr(*expr1, environment.clone())?),
-            Box::new(expand_expr(*expr2, environment.clone())?),
+            Box::new(expand_expr(*expr2, environment)?),
         )),
         AST::Sub(expr1, expr2) => Ok(AST::Sub(
             Box::new(expand_expr(*expr1, environment.clone())?),
-            Box::new(expand_expr(*expr2, environment.clone())?),
+            Box::new(expand_expr(*expr2, environment)?),
         )),
         AST::Mult(expr1, expr2) => Ok(AST::Mult(
             Box::new(expand_expr(*expr1, environment.clone())?),
-            Box::new(expand_expr(*expr2, environment.clone())?),
+            Box::new(expand_expr(*expr2, environment)?),
         )),
         AST::Div(expr1, expr2) => Ok(AST::Div(
             Box::new(expand_expr(*expr1, environment.clone())?),
-            Box::new(expand_expr(*expr2, environment.clone())?),
+            Box::new(expand_expr(*expr2, environment)?),
         )),
         AST::Mod(expr1, expr2) => Ok(AST::Mod(
             Box::new(expand_expr(*expr1, environment.clone())?),
-            Box::new(expand_expr(*expr2, environment.clone())?),
+            Box::new(expand_expr(*expr2, environment)?),
         )),
         AST::Concat(expr1, expr2) => Ok(AST::Concat(
             Box::new(expand_expr(*expr1, environment.clone())?),
-            Box::new(expand_expr(*expr2, environment.clone())?),
+            Box::new(expand_expr(*expr2, environment)?),
         )),
         AST::Cons(expr1, expr2) => Ok(AST::Cons(
             Box::new(expand_expr(*expr1, environment.clone())?),
-            Box::new(expand_expr(*expr2, environment.clone())?),
+            Box::new(expand_expr(*expr2, environment)?),
         )),
-        AST::Car(expr) => Ok(AST::Car(Box::new(expand_expr(*expr, environment.clone())?))),
-        AST::Cdr(expr) => Ok(AST::Cdr(Box::new(expand_expr(*expr, environment.clone())?))),
+        AST::Car(expr) => Ok(AST::Car(Box::new(expand_expr(*expr, environment)?))),
+        AST::Cdr(expr) => Ok(AST::Cdr(Box::new(expand_expr(*expr, environment)?))),
         AST::Let(Ident(string), binding, expr) => {
             // let rewrite_to_ident: fn(AST) -> AST = |ast: AST| match ast {
             //     AST::Lit(Lit::Symbol(string)) => AST::Var(Ident(string)),
@@ -148,31 +148,31 @@ fn expand_expr(expr: AST, mut environment: Env<AST>) -> Result<AST, String> {
         AST::Ite(guard, expr1, expr2) => Ok(AST::Ite(
             Box::new(expand_expr(*guard, environment.clone())?),
             Box::new(expand_expr(*expr1, environment.clone())?),
-            Box::new(expand_expr(*expr2, environment.clone())?),
+            Box::new(expand_expr(*expr2, environment)?),
         )),
         AST::Lt(expr1, expr2) => Ok(AST::Lt(
             Box::new(expand_expr(*expr1, environment.clone())?),
-            Box::new(expand_expr(*expr2, environment.clone())?),
+            Box::new(expand_expr(*expr2, environment)?),
         )),
         AST::Gt(expr1, expr2) => Ok(AST::Gt(
             Box::new(expand_expr(*expr1, environment.clone())?),
-            Box::new(expand_expr(*expr2, environment.clone())?),
+            Box::new(expand_expr(*expr2, environment)?),
         )),
         AST::Eq(expr1, expr2) => Ok(AST::Eq(
             Box::new(expand_expr(*expr1, environment.clone())?),
-            Box::new(expand_expr(*expr2, environment.clone())?),
+            Box::new(expand_expr(*expr2, environment)?),
         )),
         AST::Or(expr1, expr2) => Ok(AST::Or(
             Box::new(expand_expr(*expr1, environment.clone())?),
-            Box::new(expand_expr(*expr2, environment.clone())?),
+            Box::new(expand_expr(*expr2, environment)?),
         )),
         AST::And(expr1, expr2) => Ok(AST::And(
             Box::new(expand_expr(*expr1, environment.clone())?),
-            Box::new(expand_expr(*expr2, environment.clone())?),
+            Box::new(expand_expr(*expr2, environment)?),
         )),
         AST::Emptyp(expr) => Ok(AST::Emptyp(Box::new(expand_expr(
             *expr,
-            environment.clone(),
+            environment,
         )?))),
         AST::Lit(lit) => Ok(AST::Lit(lit)),
         AST::Var(Ident(str)) => Ok({

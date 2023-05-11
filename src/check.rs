@@ -1,7 +1,6 @@
 #![allow(dead_code)]
 
-use crate::data::{Env, Ident, Lit, Toplevel, AST};
-use crate::expand::expand;
+use crate::data::{Env, Ident, Lit, AST};
 
 #[derive(Debug, Eq, Clone)]
 pub enum Type {
@@ -117,7 +116,7 @@ fn infer_expr(expr: AST, env: Env<Type>) -> Result<Type, TypeError> {
                 .lookup(&name)
                 .map_err(|_| TypeError::LookupFailure(name))?;
 
-            match func_sig.clone() {
+            match func_sig {
                 Type::Func(arg_types, res_type) => {
                     if args
                         .iter()
@@ -218,7 +217,8 @@ fn check_top(exprs: Vec<AST>, mut env: Env<Type>) -> Result<(), TypeError> {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::data::Env;
+    use crate::data::Toplevel;
+    use crate::expand::expand;
     use crate::parse::tokenize;
 
     #[test]
