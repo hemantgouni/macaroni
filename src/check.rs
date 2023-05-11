@@ -17,18 +17,23 @@ pub enum Type {
 
 impl PartialEq for Type {
     fn eq(&self, other: &Type) -> bool {
-        matches!(
-            (self, other),
-            (Type::Bottom, _)
-                | (_, Type::Bottom)
-                | (Type::Var(..), Type::Var(..))
-                | (Type::I64, Type::I64)
-                | (Type::Bool, Type::Bool)
-                | (Type::String, Type::String)
-                | (Type::Symbol, Type::Symbol)
-                | (Type::List(..), Type::List(..))
-                | (Type::Func(..), Type::Func(..))
-        )
+        match (self, other) {
+            (Type::Bottom, _) => true,
+            (_, Type::Bottom) => true,
+            // TODO: is this right?
+            (Type::Var(str1), Type::Var(str2)) if str1 == str2 => true,
+            (Type::I64, Type::I64) => true,
+            (Type::Bool, Type::Bool) => true,
+            (Type::String, Type::String) => true,
+            (Type::Symbol, Type::Symbol) => true,
+            (Type::List(ty1), Type::List(ty2)) if ty1 == ty2 => true,
+            (Type::Func(arg_ty1, ret_ty1), Type::Func(arg_ty2, ret_ty2))
+                if arg_ty1 == arg_ty2 && ret_ty1 == ret_ty2 =>
+            {
+                true
+            }
+            _ => false,
+        }
     }
 }
 
@@ -90,6 +95,13 @@ fn infer_expr(expr: AST, env: Env<Type>) -> Result<Type, TypeError> {
                 (Ok(_), Ok(_)) => Ok(Type::I64),
                 // TODO: Need to figure out a way to merge errors
                 (Err(tyerr), _) | (_, Err(tyerr)) => Err(tyerr),
+            }
+        }
+        AST::Cons(elem, list) => {
+            let ty = infer_expr(*elem, env.clone())?;
+            match check_expr(*list, env, Type::List(Box::new(ty.clone()))) {
+                Ok(()) => Ok(Type::List(Box::new(ty))),
+                Err(ty_err) => Err(ty_err),
             }
         }
         // TODO: Figure out a more sensible error message here, make the TypeError type able to
@@ -472,5 +484,29 @@ mod test {
         let result = check_top(ast, Env::new());
 
         assert_eq!(result, Ok(()))
+    }
+
+    #[test]
+    fn typecheck_lambda_err_3() {
+        let Toplevel(ast) = expand(
+            tokenize(
+                r#"((: (-> (I64 (List I64)) (List String))
+                       (lambda (elem input-list)
+                         (cons elem input-list))))"#,
+            )
+            .unwrap()
+            .parse_toplevel(),
+        )
+        .unwrap();
+
+        let result = check_top(ast, Env::new());
+
+        assert_eq!(
+            result,
+            Err(TypeError::Mismatch(
+                Expected(Type::List(Box::new(Type::String))),
+                Given(Type::List(Box::new(Type::I64))),
+            ))
+        )
     }
 }
