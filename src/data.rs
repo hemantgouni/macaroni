@@ -61,6 +61,7 @@ impl Lit {
 pub enum AST {
     Type(Type, Box<AST>),
     TypeDec(Ident, Type),
+    Lambda(Vec<Ident>, Box<AST>),
     Func(Ident, Vec<Ident>, Box<AST>),
     Call(Ident, Vec<AST>),
     Macro(Ident, Vec<Ident>, Box<AST>),
@@ -96,6 +97,7 @@ impl AST {
         match self {
             AST::Type(typ, expr) => AST::Type(typ, Box::new(Self::rewrite(*expr))),
             AST::TypeDec(ident, typ) => AST::TypeDec(ident, typ),
+            AST::Lambda(args, body) => AST::Lambda(args, Box::new(Self::rewrite(*body))),
             AST::Func(name, args, body) => AST::Func(name, args, Box::new(Self::rewrite(*body))),
             AST::Macro(name, args, body) => AST::Macro(name, args, Box::new(Self::rewrite(*body))),
             AST::Call(name, args) => AST::Call(

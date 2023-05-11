@@ -7,6 +7,11 @@ use crate::check::Type;
 fn expand_expr(expr: AST, mut environment: Env<AST>) -> Result<AST, String> {
     match expr {
         AST::Type(typ, expr) => Ok(AST::Type(typ, Box::new(expand_expr(*expr, environment)?))),
+        AST::Lambda(args, body) => {
+            // TODO: it feels kinda bad to trigger rewrites "at a distance" like this.. is there a
+            // better way?
+            Ok(AST::Lambda(args, Box::new(expand_expr(*body, environment)?)).rewrite())
+        }
         AST::MacroCall(ident, actual_args) => match environment.clone().lookup(&ident) {
             Ok(AST::Macro(_, formal_args, body)) => {
                 let binding_list: Vec<(Ident, Lit)> = formal_args
@@ -120,18 +125,18 @@ fn expand_expr(expr: AST, mut environment: Env<AST>) -> Result<AST, String> {
         AST::Car(expr) => Ok(AST::Car(Box::new(expand_expr(*expr, environment.clone())?))),
         AST::Cdr(expr) => Ok(AST::Cdr(Box::new(expand_expr(*expr, environment.clone())?))),
         AST::Let(Ident(string), binding, expr) => {
-            let rewrite_to_ident: fn(AST) -> AST = |ast: AST| match ast {
-                AST::Lit(Lit::Symbol(string)) => AST::Var(Ident(string)),
-                _ => panic!("Ident rewrite lambda called on non-symbol: this is a bug!"),
-            };
+            // let rewrite_to_ident: fn(AST) -> AST = |ast: AST| match ast {
+            //     AST::Lit(Lit::Symbol(string)) => AST::Var(Ident(string)),
+            //     _ => panic!("Ident rewrite lambda called on non-symbol: this is a bug!"),
+            // };
 
-            let environment = environment.insert(
-                Ident(string.to_owned()),
-                AST::Rewrite(
-                    Box::new(AST::Lit(Lit::Symbol(string.to_owned()))),
-                    rewrite_to_ident,
-                ),
-            );
+            // let environment = environment.insert(
+            //     Ident(string.to_owned()),
+            //     AST::Rewrite(
+            //         Box::new(AST::Lit(Lit::Symbol(string.to_owned()))),
+            //         rewrite_to_ident,
+            //     ),
+            // );
 
             Ok(AST::Let(
                 Ident(string),
@@ -170,7 +175,14 @@ fn expand_expr(expr: AST, mut environment: Env<AST>) -> Result<AST, String> {
             environment.clone(),
         )?))),
         AST::Lit(lit) => Ok(AST::Lit(lit)),
-        AST::Var(ident) => environment.lookup(&ident),
+        AST::Var(Ident(str)) => Ok({
+            let rewrite_to_ident: fn(AST) -> AST = |ast: AST| match ast {
+                AST::Lit(Lit::Symbol(string)) => AST::Var(Ident(string)),
+                _ => panic!("Ident rewrite lambda called on non-symbol: this is a bug!"),
+            };
+
+            AST::Rewrite(Box::new(AST::Lit(Lit::Symbol(str))), rewrite_to_ident)
+        }),
         other => Err(format!(
             "Macro expansion not yet implemented for {:?}",
             other
@@ -181,30 +193,30 @@ fn expand_expr(expr: AST, mut environment: Env<AST>) -> Result<AST, String> {
 fn expand_top(forms: Vec<AST>, mut out_env: Env<AST>) -> Result<Vec<AST>, String> {
     match forms.as_slice() {
         [AST::Func(ident, args, body), rest @ ..] => {
-            let rewrite_to_ident: fn(AST) -> AST = |ast: AST| match ast {
-                AST::Lit(Lit::Symbol(string)) => AST::Var(Ident(string)),
-                _ => panic!("Ident rewrite lambda called on non-symbol: this is a bug!"),
-            };
+            // let rewrite_to_ident: fn(AST) -> AST = |ast: AST| match ast {
+            //     AST::Lit(Lit::Symbol(string)) => AST::Var(Ident(string)),
+            //     _ => panic!("Ident rewrite lambda called on non-symbol: this is a bug!"),
+            // };
 
-            let binding_list: Vec<(Ident, AST)> = args
-                .iter()
-                .map(|Ident(arg_str)| {
-                    (
-                        Ident(arg_str.to_string()),
-                        AST::Rewrite(
-                            Box::new(AST::Lit(Lit::Symbol(arg_str.to_string()))),
-                            rewrite_to_ident,
-                        ),
-                    )
-                })
-                .collect();
+            // let binding_list: Vec<(Ident, AST)> = args
+            //     .iter()
+            //     .map(|Ident(arg_str)| {
+            //         (
+            //             Ident(arg_str.to_string()),
+            //             AST::Rewrite(
+            //                 Box::new(AST::Lit(Lit::Symbol(arg_str.to_string()))),
+            //                 rewrite_to_ident,
+            //             ),
+            //         )
+            //     })
+            //     .collect();
 
-            let mut bind_env: Env<AST> = binding_list.iter().fold(
-                Ok(out_env.to_owned()),
-                |env: Result<Env<AST>, String>, (ident, ast)| {
-                    Ok(env?.insert(ident.to_owned(), ast.to_owned()))
-                },
-            )?;
+            // let mut bind_env: Env<AST> = binding_list.iter().fold(
+            //     Ok(out_env.to_owned()),
+            //     |env: Result<Env<AST>, String>, (ident, ast)| {
+            //         Ok(env?.insert(ident.to_owned(), ast.to_owned()))
+            //     },
+            // )?;
 
             let expanded_func: AST = AST::Func(
                 ident.to_owned(),
@@ -212,7 +224,7 @@ fn expand_top(forms: Vec<AST>, mut out_env: Env<AST>) -> Result<Vec<AST>, String
                 Box::new(
                     expand_expr(
                         *body.to_owned(),
-                        bind_env.insert(
+                        out_env.insert(
                             ident.to_owned(),
                             AST::Func(ident.to_owned(), args.to_owned(), body.to_owned()),
                         ),
@@ -230,35 +242,35 @@ fn expand_top(forms: Vec<AST>, mut out_env: Env<AST>) -> Result<Vec<AST>, String
             ))
         }
         [AST::Macro(ident, args, body), rest @ ..] => {
-            let rewrite_to_ident: fn(AST) -> AST = |ast: AST| match ast {
-                AST::Lit(Lit::Symbol(string)) => AST::Var(Ident(string)),
-                _ => panic!("Ident rewrite lambda called on non-symbol: this is a bug!"),
-            };
+            // let rewrite_to_ident: fn(AST) -> AST = |ast: AST| match ast {
+            //     AST::Lit(Lit::Symbol(string)) => AST::Var(Ident(string)),
+            //     _ => panic!("Ident rewrite lambda called on non-symbol: this is a bug!"),
+            // };
 
-            let binding_list: Vec<(Ident, AST)> = args
-                .iter()
-                .map(|Ident(arg_str)| {
-                    (
-                        Ident(arg_str.to_string()),
-                        AST::Rewrite(
-                            Box::new(AST::Lit(Lit::Symbol(arg_str.to_string()))),
-                            rewrite_to_ident,
-                        ),
-                    )
-                })
-                .collect();
+            // let binding_list: Vec<(Ident, AST)> = args
+            //     .iter()
+            //     .map(|Ident(arg_str)| {
+            //         (
+            //             Ident(arg_str.to_string()),
+            //             AST::Rewrite(
+            //                 Box::new(AST::Lit(Lit::Symbol(arg_str.to_string()))),
+            //                 rewrite_to_ident,
+            //             ),
+            //         )
+            //     })
+            //     .collect();
 
-            let bind_env: Env<AST> = binding_list.iter().fold(
-                Ok(out_env.to_owned()),
-                |env: Result<Env<AST>, String>, (ident, ast)| {
-                    Ok(env?.insert(ident.to_owned(), ast.to_owned()))
-                },
-            )?;
+            // let bind_env: Env<AST> = binding_list.iter().fold(
+            //     Ok(out_env.to_owned()),
+            //     |env: Result<Env<AST>, String>, (ident, ast)| {
+            //         Ok(env?.insert(ident.to_owned(), ast.to_owned()))
+            //     },
+            // )?;
 
             let expanded_func: AST = AST::Macro(
                 ident.to_owned(),
                 args.to_owned(),
-                Box::new(expand_expr(*body.to_owned(), bind_env)?.rewrite()),
+                Box::new(expand_expr(*body.to_owned(), out_env.clone())?.rewrite()),
             );
 
             Ok(concat(

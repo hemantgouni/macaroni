@@ -18,6 +18,7 @@ fn parse_type(elem: &Elem<String>) -> Type {
         Elem::Symbol(str) => Type::Var(str.to_string()),
         Elem::List(elems) => match elems.as_slice() {
             [Elem::Symbol(str), typ] if str == "List" => Type::List(Box::new(parse_type(typ))),
+            // TODO: add tests for function type parsing
             [Elem::Symbol(str), Elem::List(arg_types), body_type] if str == "->" => Type::Func(
                 arg_types.iter().map(parse_type).collect(),
                 Box::new(parse_type(body_type)),
@@ -44,6 +45,18 @@ impl Elem<String> {
                         .unwrap_or_else(|_| AST::Var(Ident(str)))
                 }),
             Elem::List(elems) => match elems.as_slice() {
+                [Elem::Symbol(str), Elem::List(args), body] if str == "lambda" => AST::Lambda(
+                    args.iter()
+                        .map(|arg| match arg {
+                            Elem::Symbol(str) => (*str).as_str().into(),
+                            other => panic!(
+                                "Only valid identifiers allowed in argument lists: {:?}",
+                                other
+                            ),
+                        })
+                        .collect(),
+                    Box::new(body.to_owned().parse()),
+                ),
                 [Elem::Symbol(str), typ, expr] if str == ":" => {
                     AST::Type(parse_type(typ), Box::new(expr.clone().parse()))
                 }
@@ -138,6 +151,7 @@ impl Elem<String> {
                     .iter()
                     .map(|elem| match elem {
                         Elem::List(toplevel_form) => match toplevel_form.as_slice() {
+                            // TODO: add tests for this case, it's not trivial
                             [Elem::Symbol(str), Elem::Symbol(ident), typ] if str == "declare" => {
                                 AST::TypeDec((*ident).as_str().into(), parse_type(typ))
                             }

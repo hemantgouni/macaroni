@@ -144,7 +144,7 @@ fn check_expr(expr: AST, mut env: Env<Type>, expected: Type) -> Result<(), TypeE
         }
         // this is a top level form so we should probably register the name somewhere? or are we
         // assuming it's already registered as such?
-        AST::Func(_, args, body) => match expected {
+        AST::Func(_, args, body) | AST::Lambda(args, body) => match expected {
             Type::Func(arg_types, body_type) => {
                 let args_env: Env<Type> =
                     args.iter()
@@ -184,7 +184,17 @@ fn check_top(exprs: Vec<AST>, mut env: Env<Type>) -> Result<(), TypeError> {
             rest.to_vec(),
             env.insert(name.to_owned(), func_type.to_owned()),
         ),
-        [AST::Func(..) | AST::Macro(..), rest @ ..] => check_top(rest.to_vec(), env.to_owned()),
+        // type checking the function body here
+        [func @ AST::Func(name, ..), rest @ ..] => match check_expr(
+            func.to_owned(),
+            env.clone(),
+            env.lookup(name)
+                .map_err(|_| TypeError::LookupFailure(name.to_owned()))?,
+        ) {
+            Ok(()) => check_top(rest.to_vec(), env.to_owned()),
+            other => other,
+        },
+        [AST::Macro(..), rest @ ..] => check_top(rest.to_vec(), env.to_owned()),
         [expr] => check_expr(expr.to_owned(), env, Type::Bottom),
         _ => Err(TypeError::Mismatch(
             Expected(Type::Bottom),
@@ -317,6 +327,142 @@ mod test {
                     (fn add (operand1 operand2)
                       (+ operand1 operand2))
                     (: I64 (add 1 4)))"#,
+            )
+            .unwrap()
+            .parse_toplevel(),
+        )
+        .unwrap();
+
+        let result = check_top(ast, Env::new());
+
+        assert_eq!(result, Ok(()))
+    }
+
+    #[test]
+    fn typecheck_call_err() {
+        let Toplevel(ast) = expand(
+            tokenize(
+                r#"((declare add (-> (I64 I64) I64))
+                    (fn add (operand1 operand2)
+                      (+ operand1 operand2))
+                    (: String (add 1 4)))"#,
+            )
+            .unwrap()
+            .parse_toplevel(),
+        )
+        .unwrap();
+
+        let result = check_top(ast, Env::new());
+
+        assert_eq!(
+            result,
+            Err(TypeError::Mismatch(
+                Expected(Type::String),
+                Given(Type::I64)
+            ))
+        )
+    }
+
+    #[test]
+    fn typecheck_func_err() {
+        let Toplevel(ast) = expand(
+            tokenize(
+                r#"((declare add (-> (I64 I64) I64))
+                    (fn add (operand1 operand2)
+                      (+ operand1 "hello :)"))
+                    (: String (add 1 4)))"#,
+            )
+            .unwrap()
+            .parse_toplevel(),
+        )
+        .unwrap();
+
+        let result = check_top(ast, Env::new());
+
+        assert_eq!(
+            result,
+            Err(TypeError::Mismatch(
+                Expected(Type::I64),
+                Given(Type::String)
+            ))
+        )
+    }
+
+    #[test]
+    fn typecheck_lambda_1() {
+        let Toplevel(ast) = expand(
+            tokenize(r#"((: (-> (I64 I64) I64) (lambda (arg1 arg2) (+ arg1 arg2))))"#)
+                .unwrap()
+                .parse_toplevel(),
+        )
+        .unwrap();
+
+        let result = check_top(ast, Env::new());
+
+        assert_eq!(result, Ok(()))
+    }
+
+    #[test]
+    fn typecheck_lambda_err_1() {
+        let Toplevel(ast) = expand(
+            tokenize(r#"((: (-> (I64 I64) I64) (lambda (arg1 arg2) (+ arg1 "hey:)"))))"#)
+                .unwrap()
+                .parse_toplevel(),
+        )
+        .unwrap();
+
+        let result = check_top(ast, Env::new());
+
+        assert_eq!(
+            result,
+            Err(TypeError::Mismatch(
+                Expected(Type::I64),
+                Given(Type::String)
+            ))
+        )
+    }
+
+    #[test]
+    fn typecheck_lambda_err_2() {
+        let Toplevel(ast) = expand(
+            tokenize(r#"((: (-> (I64 I64) String) (lambda (arg1 arg2) (+ arg1 arg2))))"#)
+                .unwrap()
+                .parse_toplevel(),
+        )
+        .unwrap();
+
+        let result = check_top(ast, Env::new());
+
+        assert_eq!(
+            result,
+            Err(TypeError::Mismatch(
+                Expected(Type::String),
+                Given(Type::I64)
+            ))
+        )
+    }
+
+    #[test]
+    fn typecheck_lambda_2() {
+        let Toplevel(ast) = expand(
+            tokenize(r#"((: (-> (I64 I64) String) (lambda (arg1 arg2) "hey:)")))"#)
+                .unwrap()
+                .parse_toplevel(),
+        )
+        .unwrap();
+
+        let result = check_top(ast, Env::new());
+
+        assert_eq!(result, Ok(()))
+    }
+
+    #[test]
+    fn typecheck_lambda_3() {
+        let Toplevel(ast) = expand(
+            tokenize(
+                r#"((: (-> (I64 (List I64)) (List I64))
+                       (lambda (elem input-list)
+                         (cons elem input-list))))"#,
             )
             .unwrap()
             .parse_toplevel(),
