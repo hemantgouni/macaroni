@@ -403,7 +403,8 @@ mod test {
     #[test]
     fn typecheck_lambda_1() {
         let Toplevel(ast) = expand(
-            tokenize(r#"((: (-> (I64 I64) I64) (lambda (arg1 arg2) (+ arg1 arg2))))"#)
+            tokenize(r#"((: (-> (I64 I64) I64)
+                            (lambda (arg1 arg2) (+ arg1 arg2))))"#)
                 .unwrap()
                 .parse_toplevel(),
         )
@@ -417,7 +418,8 @@ mod test {
     #[test]
     fn typecheck_lambda_err_1() {
         let Toplevel(ast) = expand(
-            tokenize(r#"((: (-> (I64 I64) I64) (lambda (arg1 arg2) (+ arg1 "hey:)"))))"#)
+            tokenize(r#"((: (-> (I64 I64) I64)
+                            (lambda (arg1 arg2) (+ arg1 "hey:)"))))"#)
                 .unwrap()
                 .parse_toplevel(),
         )
@@ -437,7 +439,8 @@ mod test {
     #[test]
     fn typecheck_lambda_err_2() {
         let Toplevel(ast) = expand(
-            tokenize(r#"((: (-> (I64 I64) String) (lambda (arg1 arg2) (+ arg1 arg2))))"#)
+            tokenize(r#"((: (-> (I64 I64) String)
+                            (lambda (arg1 arg2) (+ arg1 arg2))))"#)
                 .unwrap()
                 .parse_toplevel(),
         )
@@ -457,7 +460,8 @@ mod test {
     #[test]
     fn typecheck_lambda_2() {
         let Toplevel(ast) = expand(
-            tokenize(r#"((: (-> (I64 I64) String) (lambda (arg1 arg2) "hey:)")))"#)
+            tokenize(r#"((: (-> (I64 I64) String)
+                            (lambda (arg1 arg2) "hey:)")))"#)
                 .unwrap()
                 .parse_toplevel(),
         )

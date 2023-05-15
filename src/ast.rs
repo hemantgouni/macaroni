@@ -134,9 +134,20 @@ impl Elem<String> {
                     Box::new(num1.clone().parse()),
                     Box::new(num2.clone().parse()),
                 ),
+                // next two distinguished bc we can't use macros as values!
+                //
+                // (as in, only syntax that matches this next pattern could
+                // be an invocation of a macro)
+                //
+                // App and Call should be distinct because they're
+                // semantically different, both in the statics and the dynamics
                 [Elem::Symbol(ident), rest @ ..] => AST::MacroCall(
                     (*ident).as_str().into(),
                     rest.iter().map(quote_elem).collect(),
+                ),
+                [lambda, args @ ..] => AST::App(
+                    Box::new(lambda.clone().parse()),
+                    args.iter().map(|arg| arg.clone().parse()).collect(),
                 ),
                 other => panic!("Unable to abstractify: {:#?}", other),
             },
