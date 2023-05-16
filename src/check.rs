@@ -130,6 +130,23 @@ fn infer_expr(expr: AST, env: Env<Type>) -> Result<Type, TypeError> {
                 Err(ty_err) => Err(ty_err),
             }
         }
+        AST::Cdr(list) => infer_expr(*list, env.clone()),
+        AST::Car(list) => match infer_expr(*list, env.clone()) {
+            Ok(Type::List(typ)) => Ok(*typ),
+            Ok(typ) => Err(TypeError::Mismatch(
+                Expected(Type::List(Box::new(Type::Bottom))),
+                Given(typ),
+            )),
+            Err(typ_err) => Err(typ_err),
+        },
+        AST::Emptyp(list) => match infer_expr(*list, env.clone()) {
+            Ok(Type::List(_)) => Ok(Type::Bool),
+            Ok(typ) => Err(TypeError::Mismatch(
+                Expected(Type::List(Box::new(Type::Bottom))),
+                Given(typ),
+            )),
+            Err(typ_err) => Err(typ_err),
+        },
         // TODO: Figure out a more sensible error message here, make the TypeError type able to
         // handle this
         //
@@ -197,20 +214,32 @@ fn check_expr(expr: AST, mut env: Env<Type>, expected: Type) -> Result<(), TypeE
             let binding_type = infer_expr(*binding, env.clone())?;
             check_expr(*body, env.insert(name, binding_type), expected)
         }
+        AST::Ite(guard, branch1, branch2) => {
+            match (
+                check_expr(*guard, env.clone(), Type::Bool),
+                check_expr(*branch1, env.clone(), expected.clone()),
+                check_expr(*branch2, env.clone(), expected),
+            ) {
+                (Ok(()), Ok(()), Ok(())) => Ok(()),
+                (Err(typ_err), _, _) | (_, Err(typ_err), _) | (_, _, Err(typ_err)) => Err(typ_err),
+            }
+        }
         // this is a top level form so we should probably register the name somewhere? or are we
         // assuming it's already registered as such?
         AST::Func(_, args, body) | AST::Lambda(args, body) => match expected {
-            Type::Func(arg_types, body_type) => {
+            // ensure the argument numbers are the same
+            // TODO: emit a more sensible type error for this case!
+            Type::Func(arg_types, body_type) if args.iter().count() == arg_types.iter().count() => {
                 let args_env: Env<Type> =
                     args.iter()
                         .zip(arg_types.iter())
                         .fold(env, |mut env, arg_and_type| {
+                            dbg!(arg_and_type);
                             env.insert(arg_and_type.0.clone(), arg_and_type.1.clone())
                         });
                 check_expr(*body, args_env, *body_type)
             }
-            // TODO: Another place where the TypeError type needs to be extended (or this needs to
-            // be generalized into a trait) to handle more kinds of type checking failure cases
+            // TODO: Another place where the TypeError type needs to be extended
             other => Err(TypeError::Mismatch(
                 Expected(Type::Func(Vec::new(), Box::new(Type::Bottom))),
                 Given(other),
@@ -587,7 +616,29 @@ mod test {
     }
 
     #[test]
-    fn typecheck_app_err() {
+    fn typecheck_app_2() {
+        let Toplevel(ast) = expand(
+            tokenize(
+                r#"((declare map (-> ((-> (I64) String) (List I64)) (List String)))
+                    (fn map (f input-list)
+                      (if (empty? input-list)
+                       (list)
+                       (cons (f (car input-list)) (map f (cdr input-list)))))
+                    (map (: (-> (I64) String) (lambda (elem) "hey!"))
+                         (list 1 4 5 8)))"#,
+            )
+            .unwrap()
+            .parse_toplevel(),
+        )
+        .unwrap();
+
+        let result = check_top(ast, Env::new());
+
+        assert_eq!(result, Ok(()))
+    }
+
+    #[test]
+    fn typecheck_app_err_1() {
         let Toplevel(ast) = expand(
             tokenize(
                 r#"(((: (-> (I64 (List I64)) (List I64))
@@ -606,6 +657,35 @@ mod test {
             Err(TypeError::Mismatch(
                 Expected(Type::I64),
                 Given(Type::String)
+            ))
+        )
+    }
+
+    #[test]
+    fn typecheck_app_err_2() {
+        // there's a subtle bug in this program. can you spot it? the type checker did!
+        let Toplevel(ast) = expand(
+            tokenize(
+                r#"((declare map (-> ((-> (I64) String) (List I64)) (List String)))
+                    (fn map (f input-list)
+                      (if (empty? input-list)
+                       (list)
+                       (cons (f (car input-list)) (cdr input-list))))
+                    (map (: (-> (I64) String) (lambda (elem) "hey!"))
+                         (list 1 4 5 8)))"#,
+            )
+            .unwrap()
+            .parse_toplevel(),
+        )
+        .unwrap();
+
+        let result = check_top(ast, Env::new());
+
+        assert_eq!(
+            result,
+            Err(TypeError::Mismatch(
+                Expected(Type::List(Box::new(Type::String))),
+                Given(Type::List(Box::new(Type::I64)))
             ))
         )
     }
@@ -708,7 +788,7 @@ mod test {
     // TODO: add more App tests!
     #[test]
     fn typecheck_hof_1() {
-        let Toplevel(ast) = dbg!(expand(
+        let Toplevel(ast) = expand(
             tokenize(
                 r#"((declare add (-> (I64 I64) I64))
                     (fn add (operand1 operand2)
@@ -721,7 +801,7 @@ mod test {
             .unwrap()
             .parse_toplevel(),
         )
-        .unwrap());
+        .unwrap();
 
         let result = check_top(ast, Env::new());
 
@@ -731,7 +811,7 @@ mod test {
     // TODO: add tests for functions with wrong number of arguments from declaration
     #[test]
     fn typecheck_hof_2() {
-        let Toplevel(ast) = dbg!(expand(
+        let Toplevel(ast) = expand(
             tokenize(
                 r#"((declare add-wrong-ret (-> (I64 I64) String))
                     (fn add-wrong-ret (operand1 operand2)
@@ -739,12 +819,12 @@ mod test {
                     (declare hof-add (-> ((-> (I64 I64) I64) I64 I64) I64))
                     (fn hof-add (hof operand1 operand2)
                       (hof operand1 operand2))
-                    (: I64 (hof-add add-incorrect-type 1 1)))"#
+                    (: I64 (hof-add add-incorrect-type 1 1)))"#,
             )
             .unwrap()
-            .parse_toplevel()
+            .parse_toplevel(),
         )
-        .unwrap());
+        .unwrap();
 
         let result = check_top(ast, Env::new());
 
@@ -753,20 +833,20 @@ mod test {
 
     #[test]
     fn typecheck_func_3() {
-        let Toplevel(ast) = dbg!(expand(
+        let Toplevel(ast) = expand(
             tokenize(
                 r#"((declare add-wrong (-> (I64 I64) String))
                     (fn add-wrong ()
                       "hey:)")
-                    (add-wrong 1 1))"#
+                    (add-wrong 1 1))"#,
             )
             .unwrap()
-            .parse_toplevel()
+            .parse_toplevel(),
         )
-        .unwrap());
+        .unwrap();
 
         let result = check_top(ast, Env::new());
 
-        assert_eq!(result, Ok(()))
+        assert_eq!(matches!(result, Err(_)), true)
     }
 }
