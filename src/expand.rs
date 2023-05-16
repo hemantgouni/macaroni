@@ -10,8 +10,18 @@ fn expand_expr(expr: AST, environment: Env<AST>) -> Result<AST, String> {
         AST::Lambda(args, body) => {
             // TODO: it feels kinda bad to trigger rewrites "at a distance" like this.. is there a
             // better way?
-            Ok(AST::Lambda(args, Box::new(expand_expr(*body, environment)?)).rewrite())
+            Ok(AST::Lambda(
+                args,
+                Box::new(expand_expr(*body, environment)?),
+            ))
         }
+        AST::App(lambda, args) => Ok::<AST, String>(AST::App(
+            Box::new(expand_expr(*lambda, environment)?),
+            args.iter()
+                .fold(Ok(Vec::new()), |res: Result<Vec<AST>, String>, arg| {
+                    res.map(|exp_arg| concat(exp_arg, vec![arg.clone()]))
+                })?,
+        )),
         AST::MacroCall(ident, actual_args) => match environment.lookup(&ident) {
             Ok(AST::Macro(_, formal_args, body)) => {
                 let binding_list: Vec<(Ident, Lit)> = formal_args
@@ -49,7 +59,7 @@ fn expand_expr(expr: AST, environment: Env<AST>) -> Result<AST, String> {
                     environment?,
                 )
             }
-            Ok(AST::Func(..)) => Ok(AST::Call(
+            _ => Ok(AST::Call(
                 ident,
                 actual_args.iter().fold(
                     Ok(vec![]),
@@ -64,10 +74,6 @@ fn expand_expr(expr: AST, environment: Env<AST>) -> Result<AST, String> {
                         ))
                     },
                 )?,
-            )),
-            other => Err(format!(
-                "Unexpected or non-existent top-level binding in environment: {:?}",
-                other
             )),
         },
         // TODO: Figure out why we need this!
@@ -142,8 +148,7 @@ fn expand_expr(expr: AST, environment: Env<AST>) -> Result<AST, String> {
                 Ident(string),
                 Box::new(expand_expr(*binding, environment.clone())?),
                 Box::new(expand_expr(*expr, environment)?),
-            )
-            .rewrite())
+            ))
         }
         AST::Ite(guard, expr1, expr2) => Ok(AST::Ite(
             Box::new(expand_expr(*guard, environment.clone())?),
@@ -170,10 +175,7 @@ fn expand_expr(expr: AST, environment: Env<AST>) -> Result<AST, String> {
             Box::new(expand_expr(*expr1, environment.clone())?),
             Box::new(expand_expr(*expr2, environment)?),
         )),
-        AST::Emptyp(expr) => Ok(AST::Emptyp(Box::new(expand_expr(
-            *expr,
-            environment,
-        )?))),
+        AST::Emptyp(expr) => Ok(AST::Emptyp(Box::new(expand_expr(*expr, environment)?))),
         AST::Lit(lit) => Ok(AST::Lit(lit)),
         AST::Var(Ident(str)) => Ok({
             let rewrite_to_ident: fn(AST) -> AST = |ast: AST| match ast {
@@ -285,7 +287,7 @@ fn expand_top(forms: Vec<AST>, mut out_env: Env<AST>) -> Result<Vec<AST>, String
             vec![func_type_dec.to_owned()],
             expand_top(rest.to_vec(), out_env)?,
         )),
-        [expr, ..] => Ok(vec![expand_expr(expr.to_owned(), out_env)?]),
+        [expr, ..] => Ok(vec![expand_expr(expr.to_owned(), out_env)?.rewrite()]),
         [] => Err(
             "expand_top either didn't find any top-level forms or a runnable expr. This is a bug!"
                 .to_string(),

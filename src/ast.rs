@@ -141,6 +141,12 @@ impl Elem<String> {
                 //
                 // App and Call should be distinct because they're
                 // semantically different, both in the statics and the dynamics
+                //
+                // TODO: named function declarations feel like they should really
+                // desugar to nested let bindings of lambdas!
+                //
+                // though this leaves Call and App as distinct constructs, which
+                // is okay because they usually are (even in real semantics like Oxide, remember?)
                 [Elem::Symbol(ident), rest @ ..] => AST::MacroCall(
                     (*ident).as_str().into(),
                     rest.iter().map(quote_elem).collect(),

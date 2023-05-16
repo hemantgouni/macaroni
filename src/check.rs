@@ -36,13 +36,13 @@ impl PartialEq for Type {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 struct Expected(Type);
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 struct Given(Type);
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 enum TypeError {
     Mismatch(Expected, Given),
     LookupFailure(Ident),
@@ -83,6 +83,16 @@ fn infer_expr(expr: AST, env: Env<Type>) -> Result<Type, TypeError> {
             Ok(()) => Ok(ty.clone()),
             Err(tyerr) => Err(tyerr),
         },
+        AST::Concat(expr1, expr2) => {
+            match (
+                check_expr(*expr1, env.clone(), Type::String),
+                check_expr(*expr2, env, Type::String),
+            ) {
+                (Ok(()), Ok(())) => Ok(Type::String),
+                // TODO: Need to figure out a way to merge errors
+                (Err(tyerr), _) | (_, Err(tyerr)) => Err(tyerr),
+            }
+        }
         AST::Add(expr1, expr2)
         | AST::Mult(expr1, expr2)
         | AST::Sub(expr1, expr2)
@@ -96,6 +106,23 @@ fn infer_expr(expr: AST, env: Env<Type>) -> Result<Type, TypeError> {
                 (Err(tyerr), _) | (_, Err(tyerr)) => Err(tyerr),
             }
         }
+        AST::List(elems) => match elems.as_slice() {
+            [] => Ok(Type::List(Box::new(Type::Bottom))),
+            [first, rest @ ..] => {
+                let expected_elem_type: Type = infer_expr(first.clone(), env.clone())?;
+                rest.iter().fold(
+                    Ok(Type::List(Box::new(expected_elem_type.clone()))),
+                    |prev, next| match (
+                        prev,
+                        check_expr(next.clone(), env.clone(), expected_elem_type.clone()),
+                    ) {
+                        (Ok(typ), Ok(())) => Ok(typ),
+                        (Err(typ_err), _) => Err(typ_err),
+                        (Ok(_), Err(typ_err)) => Err(typ_err),
+                    },
+                )
+            }
+        },
         AST::Cons(elem, list) => {
             let ty = infer_expr(*elem, env.clone())?;
             match check_expr(*list, env, Type::List(Box::new(ty.clone()))) {
@@ -111,6 +138,23 @@ fn infer_expr(expr: AST, env: Env<Type>) -> Result<Type, TypeError> {
         AST::Var(ident) => env
             .lookup(&ident)
             .map_err(|_| TypeError::LookupFailure(ident)),
+        AST::App(lambda, args) => match infer_expr(*lambda, env.clone())? {
+            Type::Func(arg_types, res_type) => arg_types.clone().iter().zip(args.iter()).fold(
+                Ok(Type::Func(arg_types, res_type)),
+                |res, (expected, given_arg)| match (
+                    res.clone(),
+                    check_expr(given_arg.clone(), env.clone(), expected.clone()),
+                ) {
+                    (Err(typ_err), _) => Err(typ_err),
+                    (Ok(_), Err(typ_err)) => Err(typ_err),
+                    (Ok(typ), Ok(())) => Ok(typ),
+                },
+            ),
+            other => Err(TypeError::Mismatch(
+                Expected(Type::Func(vec![Type::Bottom], Box::new(Type::Bottom))),
+                Given(other),
+            )),
+        },
         AST::Call(name, args) => {
             let func_sig = env
                 .lookup(&name)
@@ -174,6 +218,8 @@ fn check_expr(expr: AST, mut env: Env<Type>, expected: Type) -> Result<(), TypeE
         },
         // We can call this with Type::Bottom to start type checking if the top level
         // expr is unannotated? Since Bottom is equal to any other type
+        //
+        // TODO: use type_eq_or_err here?
         //
         // the subsumption rule is here
         _ => match infer_expr(expr, env) {
@@ -337,7 +383,7 @@ mod test {
             tokenize(
                 r#"((declare add (-> (I64 I64) I64))
                     (fn add (operand1 operand2)
-                      (+ operand1 operand2))
+                      (/ operand1 operand2))
                     (: I64 (add 1 4)))"#,
             )
             .unwrap()
@@ -356,7 +402,7 @@ mod test {
             tokenize(
                 r#"((declare add (-> (I64 I64) I64))
                     (fn add (operand1 operand2)
-                      (+ operand1 operand2))
+                      (/ operand1 operand2))
                     (: String (add 1 4)))"#,
             )
             .unwrap()
@@ -403,10 +449,12 @@ mod test {
     #[test]
     fn typecheck_lambda_1() {
         let Toplevel(ast) = expand(
-            tokenize(r#"((: (-> (I64 I64) I64)
-                            (lambda (arg1 arg2) (+ arg1 arg2))))"#)
-                .unwrap()
-                .parse_toplevel(),
+            tokenize(
+                r#"((: (-> (I64 I64) I64)
+                       (lambda (arg1 arg2) (+ arg1 arg2))))"#,
+            )
+            .unwrap()
+            .parse_toplevel(),
         )
         .unwrap();
 
@@ -418,10 +466,12 @@ mod test {
     #[test]
     fn typecheck_lambda_err_1() {
         let Toplevel(ast) = expand(
-            tokenize(r#"((: (-> (I64 I64) I64)
-                            (lambda (arg1 arg2) (+ arg1 "hey:)"))))"#)
-                .unwrap()
-                .parse_toplevel(),
+            tokenize(
+                r#"((: (-> (I64 I64) I64)
+                       (lambda (arg1 arg2) (+ arg1 "hey:)"))))"#,
+            )
+            .unwrap()
+            .parse_toplevel(),
         )
         .unwrap();
 
@@ -439,10 +489,12 @@ mod test {
     #[test]
     fn typecheck_lambda_err_2() {
         let Toplevel(ast) = expand(
-            tokenize(r#"((: (-> (I64 I64) String)
-                            (lambda (arg1 arg2) (+ arg1 arg2))))"#)
-                .unwrap()
-                .parse_toplevel(),
+            tokenize(
+                r#"((: (-> (I64 I64) String)
+                       (lambda (arg1 arg2) (+ arg1 arg2))))"#,
+            )
+            .unwrap()
+            .parse_toplevel(),
         )
         .unwrap();
 
@@ -460,10 +512,12 @@ mod test {
     #[test]
     fn typecheck_lambda_2() {
         let Toplevel(ast) = expand(
-            tokenize(r#"((: (-> (I64 I64) String)
-                            (lambda (arg1 arg2) "hey:)")))"#)
-                .unwrap()
-                .parse_toplevel(),
+            tokenize(
+                r#"((: (-> (I64 I64) String)
+                       (lambda (arg1 arg2) "hey:)")))"#,
+            )
+            .unwrap()
+            .parse_toplevel(),
         )
         .unwrap();
 
@@ -512,5 +566,207 @@ mod test {
                 Given(Type::List(Box::new(Type::I64))),
             ))
         )
+    }
+
+    #[test]
+    fn typecheck_app_1() {
+        let Toplevel(ast) = expand(
+            tokenize(
+                r#"(((: (-> (I64 (List I64)) (List I64))
+                        (lambda (elem input-list)
+                          (cons elem input-list))) 1 (list 1 2 3 4)))"#,
+            )
+            .unwrap()
+            .parse_toplevel(),
+        )
+        .unwrap();
+
+        let result = check_top(ast, Env::new());
+
+        assert_eq!(result, Ok(()))
+    }
+
+    #[test]
+    fn typecheck_app_err() {
+        let Toplevel(ast) = expand(
+            tokenize(
+                r#"(((: (-> (I64 (List I64)) (List I64))
+                        (lambda (elem input-list)
+                          (cons elem input-list))) "hey" (list 1 2 3 4)))"#,
+            )
+            .unwrap()
+            .parse_toplevel(),
+        )
+        .unwrap();
+
+        let result = check_top(ast, Env::new());
+
+        assert_eq!(
+            result,
+            Err(TypeError::Mismatch(
+                Expected(Type::I64),
+                Given(Type::String)
+            ))
+        )
+    }
+
+    #[test]
+    fn typecheck_app_let() {
+        let Toplevel(ast) = expand(
+            tokenize(
+                r#"((let my-cons (: (-> (I64 (List I64)) (List I64))
+                                    (lambda (elem input-list)
+                                        (cons elem input-list)))
+                      (my-cons 1 (list 1 2 3 4))))"#,
+            )
+            .unwrap()
+            .parse_toplevel(),
+        )
+        .unwrap();
+
+        let result = check_top(ast, Env::new());
+
+        assert_eq!(result, Ok(()))
+    }
+
+    #[test]
+    fn typecheck_app_let_err() {
+        let Toplevel(ast) = expand(
+            tokenize(
+                r#"((let my-cons (: (-> (I64 (List I64)) (List I64))
+                                    (lambda (elem input-list)
+                                        (cons elem input-list)))
+                      (my-cons "hey" (list 1 2 3 4))))"#,
+            )
+            .unwrap()
+            .parse_toplevel(),
+        )
+        .unwrap();
+
+        let result = check_top(ast, Env::new());
+
+        assert_eq!(
+            result,
+            Err(TypeError::Mismatch(
+                Expected(Type::I64),
+                Given(Type::String)
+            ))
+        )
+    }
+
+    #[test]
+    fn typecheck_list() {
+        let Toplevel(ast) =
+            expand(tokenize(r#"((list 1 2 3 4))"#).unwrap().parse_toplevel()).unwrap();
+
+        let result = check_top(ast, Env::new());
+
+        assert_eq!(result, Ok(()))
+    }
+
+    #[test]
+    fn typecheck_list_err_1() {
+        let Toplevel(ast) = expand(
+            tokenize(r#"((list 1 "hey" 3 4))"#)
+                .unwrap()
+                .parse_toplevel(),
+        )
+        .unwrap();
+
+        let result = check_top(ast, Env::new());
+
+        assert_eq!(
+            result,
+            Err(TypeError::Mismatch(
+                Expected(Type::I64),
+                Given(Type::String)
+            ))
+        )
+    }
+
+    #[test]
+    fn typecheck_list_err_2() {
+        let Toplevel(ast) = expand(
+            tokenize(r#"((list 1 (++ "hey" ":)") 3 4))"#)
+                .unwrap()
+                .parse_toplevel(),
+        )
+        .unwrap();
+
+        let result = check_top(ast, Env::new());
+
+        assert_eq!(
+            result,
+            Err(TypeError::Mismatch(
+                Expected(Type::I64),
+                Given(Type::String)
+            ))
+        )
+    }
+
+    // TODO: add support for closures? though we don't really have mutable objects, i suppose
+    // TODO: add more App tests!
+    #[test]
+    fn typecheck_hof_1() {
+        let Toplevel(ast) = dbg!(expand(
+            tokenize(
+                r#"((declare add (-> (I64 I64) I64))
+                    (fn add (operand1 operand2)
+                      (+ operand1 operand2))
+                    (declare hof-add (-> ((-> (I64 I64) I64) I64 I64) I64))
+                    (fn hof-add (hof operand1 operand2)
+                      (hof operand1 operand2))
+                    (: I64 (hof-add add 1 1)))"#,
+            )
+            .unwrap()
+            .parse_toplevel(),
+        )
+        .unwrap());
+
+        let result = check_top(ast, Env::new());
+
+        assert_eq!(result, Ok(()))
+    }
+
+    // TODO: add tests for functions with wrong number of arguments from declaration
+    #[test]
+    fn typecheck_hof_2() {
+        let Toplevel(ast) = dbg!(expand(
+            tokenize(
+                r#"((declare add-wrong-ret (-> (I64 I64) String))
+                    (fn add-wrong-ret (operand1 operand2)
+                      "hey:)")
+                    (declare hof-add (-> ((-> (I64 I64) I64) I64 I64) I64))
+                    (fn hof-add (hof operand1 operand2)
+                      (hof operand1 operand2))
+                    (: I64 (hof-add add-incorrect-type 1 1)))"#
+            )
+            .unwrap()
+            .parse_toplevel()
+        )
+        .unwrap());
+
+        let result = check_top(ast, Env::new());
+
+        assert_eq!(matches!(result, Err(TypeError::Mismatch(..))), true)
+    }
+
+    #[test]
+    fn typecheck_func_3() {
+        let Toplevel(ast) = dbg!(expand(
+            tokenize(
+                r#"((declare add-wrong (-> (I64 I64) String))
+                    (fn add-wrong ()
+                      "hey:)")
+                    (add-wrong 1 1))"#
+            )
+            .unwrap()
+            .parse_toplevel()
+        )
+        .unwrap());
+
+        let result = check_top(ast, Env::new());
+
+        assert_eq!(result, Ok(()))
     }
 }
