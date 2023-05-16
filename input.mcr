@@ -1,1 +1,7 @@
-((: I64 (+ (: I64 1) (: I64 1))))
+((declare map (-> ((-> (I64) String) (List I64)) (List String)))
+ (fn map (f input-list)
+  (if (empty? input-list)
+   (list)
+   (cons (f (car input-list)) (map f (cdr input-list)))))
+ (map (: (-> (I64) String) (lambda (elem) "hey!"))
+      (list 1 4 5 8)))

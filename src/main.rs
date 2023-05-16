@@ -1,10 +1,10 @@
 mod ast;
+mod check;
 mod data;
 mod evaluate;
 mod expand;
 mod parse;
 mod utils;
-mod check;
 
 use std::{env, fs};
 
@@ -15,6 +15,10 @@ use crate::data::Toplevel;
 // we have parser combinators which are a bunch of functions that make it easier to write parsers,
 // what about the same thing for type checkers?
 
+fn print_separator() -> () {
+    println!("\n=======================================================\n");
+}
+
 fn main() {
     let args: Vec<String> = env::args().collect();
 
@@ -24,9 +28,18 @@ fn main() {
     let ast: Toplevel = parse::tokenize(&contents).unwrap().parse_toplevel();
     println!("AST: {:#?}", ast);
 
+    print_separator();
+
     let expanded_ast: Toplevel = expand::expand(ast).unwrap();
     println!("AST (Expanded): {:#?}", expanded_ast);
 
-    let res = evaluate::evaluate(expanded_ast);
-    println!("Result: {:#?}", res);
+    print_separator();
+
+    let check_result = check::check(expanded_ast);
+    println!("Type Checking result: {:#?}", check_result);
+
+    // print_separator();
+
+    // let res = evaluate::evaluate(expanded_ast);
+    // println!("Result: {:#?}", res);
 }

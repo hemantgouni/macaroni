@@ -1,6 +1,6 @@
 #![allow(dead_code)]
 
-use crate::data::{Env, Ident, Lit, AST};
+use crate::data::{Env, Ident, Lit, Toplevel, AST};
 
 #[derive(Debug, Eq, Clone)]
 pub enum Type {
@@ -37,13 +37,13 @@ impl PartialEq for Type {
 }
 
 #[derive(Debug, PartialEq, Clone)]
-struct Expected(Type);
+pub struct Expected(Type);
 
 #[derive(Debug, PartialEq, Clone)]
-struct Given(Type);
+pub struct Given(Type);
 
 #[derive(Debug, PartialEq, Clone)]
-enum TypeError {
+pub enum TypeError {
     Mismatch(Expected, Given),
     LookupFailure(Ident),
 }
@@ -234,7 +234,6 @@ fn check_expr(expr: AST, mut env: Env<Type>, expected: Type) -> Result<(), TypeE
                     args.iter()
                         .zip(arg_types.iter())
                         .fold(env, |mut env, arg_and_type| {
-                            dbg!(arg_and_type);
                             env.insert(arg_and_type.0.clone(), arg_and_type.1.clone())
                         });
                 check_expr(*body, args_env, *body_type)
@@ -289,10 +288,13 @@ fn check_top(exprs: Vec<AST>, mut env: Env<Type>) -> Result<(), TypeError> {
     }
 }
 
+pub fn check(Toplevel(ast): Toplevel) -> Result<(), TypeError> {
+    check_top(ast, Env::new())
+}
+
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::data::Toplevel;
     use crate::expand::expand;
     use crate::parse::tokenize;
 
@@ -622,8 +624,8 @@ mod test {
                 r#"((declare map (-> ((-> (I64) String) (List I64)) (List String)))
                     (fn map (f input-list)
                       (if (empty? input-list)
-                       (list)
-                       (cons (f (car input-list)) (map f (cdr input-list)))))
+                        (list)
+                        (cons (f (car input-list)) (map f (cdr input-list)))))
                     (map (: (-> (I64) String) (lambda (elem) "hey!"))
                          (list 1 4 5 8)))"#,
             )
@@ -669,8 +671,8 @@ mod test {
                 r#"((declare map (-> ((-> (I64) String) (List I64)) (List String)))
                     (fn map (f input-list)
                       (if (empty? input-list)
-                       (list)
-                       (cons (f (car input-list)) (cdr input-list))))
+                        (list)
+                        (cons (f (car input-list)) (cdr input-list))))
                     (map (: (-> (I64) String) (lambda (elem) "hey!"))
                          (list 1 4 5 8)))"#,
             )
