@@ -36,13 +36,13 @@ impl PartialEq for Type {
     }
 }
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub struct Expected(Type);
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub struct Given(Type);
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub enum TypeError {
     Mismatch(Expected, Given),
     LookupFailure(Ident),
@@ -130,8 +130,8 @@ fn infer_expr(expr: AST, env: Env<Type>) -> Result<Type, TypeError> {
                 Err(ty_err) => Err(ty_err),
             }
         }
-        AST::Cdr(list) => infer_expr(*list, env.clone()),
-        AST::Car(list) => match infer_expr(*list, env.clone()) {
+        AST::Cdr(list) => infer_expr(*list, env),
+        AST::Car(list) => match infer_expr(*list, env) {
             Ok(Type::List(typ)) => Ok(*typ),
             Ok(typ) => Err(TypeError::Mismatch(
                 Expected(Type::List(Box::new(Type::Bottom))),
@@ -139,7 +139,7 @@ fn infer_expr(expr: AST, env: Env<Type>) -> Result<Type, TypeError> {
             )),
             Err(typ_err) => Err(typ_err),
         },
-        AST::Emptyp(list) => match infer_expr(*list, env.clone()) {
+        AST::Emptyp(list) => match infer_expr(*list, env) {
             Ok(Type::List(_)) => Ok(Type::Bool),
             Ok(typ) => Err(TypeError::Mismatch(
                 Expected(Type::List(Box::new(Type::Bottom))),
@@ -154,7 +154,7 @@ fn infer_expr(expr: AST, env: Env<Type>) -> Result<Type, TypeError> {
             Type::Func(arg_types, res_type) => arg_types.clone().iter().zip(args.iter()).fold(
                 Ok(Type::Func(arg_types, res_type)),
                 |res, (expected, given_arg)| match (
-                    res.clone(),
+                    res,
                     check_expr(given_arg.clone(), env.clone(), expected.clone()),
                 ) {
                     (Err(typ_err), _) => Err(typ_err),
@@ -176,7 +176,7 @@ fn infer_expr(expr: AST, env: Env<Type>) -> Result<Type, TypeError> {
                 Type::Func(arg_types, res_type) => args.iter().zip(arg_types.iter()).fold(
                     Ok(*res_type),
                     |res, (given_arg, expected_type)| match (
-                        res.clone(),
+                        res,
                         check_expr(given_arg.clone(), env.clone(), expected_type.clone()),
                     ) {
                         (Err(typ_err), _) | (Ok(_), Err(typ_err)) => Err(typ_err),
@@ -215,7 +215,7 @@ fn check_expr(expr: AST, mut env: Env<Type>, expected: Type) -> Result<(), TypeE
         AST::Func(_, args, body) | AST::Lambda(args, body) => match expected {
             // ensure the argument numbers are the same
             // TODO: emit a more sensible type error for the case where they are not!
-            Type::Func(arg_types, body_type) if args.iter().count() == arg_types.iter().count() => {
+            Type::Func(arg_types, body_type) if args.len() == arg_types.len() => {
                 let args_env: Env<Type> =
                     args.iter()
                         .zip(arg_types.iter())
