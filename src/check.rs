@@ -147,11 +147,6 @@ fn infer_expr(expr: AST, env: Env<Type>) -> Result<Type, TypeError> {
             )),
             Err(typ_err) => Err(typ_err),
         },
-        // TODO: Figure out a more sensible error message here, make the TypeError type able to
-        // handle this
-        //
-        // Or maybe make a more generic error trait that has a .message method or something, since
-        // a variable lookup failure isn't really a type error!
         AST::Var(ident) => env
             .lookup(&ident)
             .map_err(|_| TypeError::LookupFailure(ident)),
@@ -178,25 +173,16 @@ fn infer_expr(expr: AST, env: Env<Type>) -> Result<Type, TypeError> {
                 .map_err(|_| TypeError::LookupFailure(name))?;
 
             match func_sig {
-                Type::Func(arg_types, res_type) => {
-                    if args
-                        .iter()
-                        .zip(arg_types.iter())
-                        .all(|(arg, expected_type)| {
-                            matches!(
-                                check_expr(arg.clone(), env.clone(), expected_type.clone()),
-                                Ok(())
-                            )
-                        })
-                    {
-                        Ok(*res_type)
-                    } else {
-                        Err(TypeError::Mismatch(
-                            Expected(Type::Bottom),
-                            Given(Type::Bottom),
-                        ))
-                    }
-                }
+                Type::Func(arg_types, res_type) => args.iter().zip(arg_types.iter()).fold(
+                    Ok(*res_type),
+                    |res, (given_arg, expected_type)| match (
+                        res.clone(),
+                        check_expr(given_arg.clone(), env.clone(), expected_type.clone()),
+                    ) {
+                        (Err(typ_err), _) | (Ok(_), Err(typ_err)) => Err(typ_err),
+                        (Ok(typ), Ok(())) => Ok(typ),
+                    },
+                ),
                 other => Err(TypeError::Mismatch(
                     Expected(Type::Func(vec![Type::Bottom], Box::new(Type::Bottom))),
                     Given(other),
@@ -228,7 +214,7 @@ fn check_expr(expr: AST, mut env: Env<Type>, expected: Type) -> Result<(), TypeE
         // assuming it's already registered as such?
         AST::Func(_, args, body) | AST::Lambda(args, body) => match expected {
             // ensure the argument numbers are the same
-            // TODO: emit a more sensible type error for this case!
+            // TODO: emit a more sensible type error for the case where they are not!
             Type::Func(arg_types, body_type) if args.iter().count() == arg_types.iter().count() => {
                 let args_env: Env<Type> =
                     args.iter()
@@ -819,16 +805,52 @@ mod test {
                     (declare hof-add (-> ((-> (I64 I64) I64) I64 I64) I64))
                     (fn hof-add (hof operand1 operand2)
                       (hof operand1 operand2))
-                    (: I64 (hof-add add-incorrect-type 1 1)))"#,
+                    (: I64 (hof-add add-wrong-ret 1 1)))"#,
             )
             .unwrap()
             .parse_toplevel(),
         )
         .unwrap();
 
-        let result = check_top(ast, Env::new());
+        let result = dbg!(check_top(ast, Env::new()));
 
-        assert_eq!(matches!(result, Err(TypeError::Mismatch(..))), true)
+        assert_eq!(
+            Err(TypeError::Mismatch(
+                Expected(Type::Func(vec![Type::I64, Type::I64], Box::new(Type::I64))),
+                Given(Type::Func(
+                    vec![Type::I64, Type::I64],
+                    Box::new(Type::String)
+                ))
+            )),
+            result
+        )
+    }
+
+    #[test]
+    fn typecheck_hof_3() {
+        let Toplevel(ast) = expand(
+            tokenize(
+                r#"((declare add-wrong-ret (-> (I64 I64) String))
+                    (fn add-wrong-ret (operand1 operand2)
+                      "hey:)")
+                    (declare hof-add (-> ((-> (I64 I64) I64) I64 I64) I64))
+                    (fn hof-add (hof operand1 operand2)
+                      (hof operand1 operand2))
+                    (: I64 (hof-add function-doesnt-exist 1 1)))"#,
+            )
+            .unwrap()
+            .parse_toplevel(),
+        )
+        .unwrap();
+
+        let result = dbg!(check_top(ast, Env::new()));
+
+        assert_eq!(
+            Err(TypeError::LookupFailure(Ident(
+                "function-doesnt-exist".to_string()
+            ))),
+            result
+        )
     }
 
     #[test]
