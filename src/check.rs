@@ -1,5 +1,8 @@
 #![allow(dead_code)]
 
+mod instantiate;
+mod ordered_env;
+
 use crate::data::{Env, Ident, Lit, Toplevel, AST};
 
 #[derive(Debug, PartialEq, Eq, Clone)]
@@ -7,14 +10,6 @@ pub struct UVar(pub String);
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct EVar(pub String);
-
-pub enum OrderedEnvElem {
-    UVar(UVar),
-    TVar(Ident, Type),
-    EVar(EVar),
-    ESol(EVar, Monotype),
-    Marker(EVar),
-}
 
 #[derive(Debug, Eq, Clone)]
 pub enum Type {
@@ -34,6 +29,7 @@ impl PartialEq for Type {
             {
                 true
             }
+            (Type::List(list_ty1), Type::List(list_ty2)) if list_ty1 == list_ty2 => true,
             _ => false,
         }
     }
