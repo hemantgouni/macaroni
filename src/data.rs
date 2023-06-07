@@ -1,4 +1,4 @@
-use crate::check::Type;
+use crate::monocheck::Monotype;
 use std::collections::HashMap;
 
 #[derive(Debug, Eq, PartialEq, Clone)]
@@ -59,8 +59,8 @@ impl Lit {
 
 #[derive(Debug, Eq, PartialEq, Clone)]
 pub enum AST {
-    Type(Type, Box<AST>),
-    TypeDec(Ident, Type),
+    Type(Monotype, Box<AST>),
+    TypeDec(Ident, Monotype),
     Lambda(Vec<Ident>, Box<AST>),
     App(Box<AST>, Vec<AST>),
     Func(Ident, Vec<Ident>, Box<AST>),

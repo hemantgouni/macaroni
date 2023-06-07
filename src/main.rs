@@ -1,9 +1,10 @@
 mod ast;
-mod check;
+mod monocheck;
 mod data;
 mod evaluate;
 mod expand;
 mod parse;
+mod polycheck;
 mod utils;
 
 use std::{env, fs};
@@ -35,7 +36,7 @@ fn main() {
 
     print_separator();
 
-    let check_result = check::check(expanded_ast);
+    let check_result = monocheck::check(expanded_ast);
     println!("Type Checking result: {:#?}", check_result);
 
     // print_separator();

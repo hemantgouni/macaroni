@@ -1,4 +1,4 @@
-use crate::check::Type;
+use crate::monocheck::{Monotype, UVar};
 use crate::data::{Elem, Ident, Lit, Toplevel, AST};
 
 fn quote_elem(elem: &Elem<String>) -> Lit {
@@ -10,16 +10,16 @@ fn quote_elem(elem: &Elem<String>) -> Lit {
     }
 }
 
-fn parse_type(elem: &Elem<String>) -> Type {
+fn parse_type(elem: &Elem<String>) -> Monotype {
     match elem {
-        Elem::Symbol(str) if str == "I64" => Type::I64,
-        Elem::Symbol(str) if str == "Bool" => Type::Bool,
-        Elem::Symbol(str) if str == "String" => Type::String,
-        Elem::Symbol(str) => Type::Var(str.to_string()),
+        Elem::Symbol(str) if str == "I64" => Monotype::I64,
+        Elem::Symbol(str) if str == "Bool" => Monotype::Bool,
+        Elem::Symbol(str) if str == "String" => Monotype::String,
+        Elem::Symbol(str) => Monotype::UVar(UVar(str.to_string())),
         Elem::List(elems) => match elems.as_slice() {
-            [Elem::Symbol(str), typ] if str == "List" => Type::List(Box::new(parse_type(typ))),
+            [Elem::Symbol(str), typ] if str == "List" => Monotype::List(Box::new(parse_type(typ))),
             // TODO: add tests for function type parsing
-            [Elem::Symbol(str), Elem::List(arg_types), body_type] if str == "->" => Type::Func(
+            [Elem::Symbol(str), Elem::List(arg_types), body_type] if str == "->" => Monotype::Func(
                 arg_types.iter().map(parse_type).collect(),
                 Box::new(parse_type(body_type)),
             ),

@@ -2,7 +2,7 @@ use crate::data::{Env, Ident, Lit, Toplevel, AST};
 use crate::evaluate::evaluate_expr;
 use crate::utils::concat;
 
-use crate::check::Type;
+use crate::monocheck::Monotype;
 
 fn expand_expr(expr: AST, environment: Env<AST>) -> Result<AST, String> {
     match expr {
@@ -283,7 +283,7 @@ fn expand_top(forms: Vec<AST>, mut out_env: Env<AST>) -> Result<Vec<AST>, String
                 )?,
             ))
         }
-        [func_type_dec @ AST::TypeDec(.., Type::Func(..)), rest @ ..] => Ok(concat(
+        [func_type_dec @ AST::TypeDec(.., Monotype::Func(..)), rest @ ..] => Ok(concat(
             vec![func_type_dec.to_owned()],
             expand_top(rest.to_vec(), out_env)?,
         )),
