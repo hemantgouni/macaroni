@@ -1,4 +1,4 @@
-use crate::monocheck::{Monotype, UVar};
+use crate::check::{Monotype, UVar};
 use crate::data::{Elem, Ident, Lit, Toplevel, AST};
 
 fn quote_elem(elem: &Elem<String>) -> Lit {

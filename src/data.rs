@@ -1,4 +1,4 @@
-use crate::monocheck::Monotype;
+use crate::check::Monotype;
 use std::collections::HashMap;
 
 #[derive(Debug, Eq, PartialEq, Clone)]

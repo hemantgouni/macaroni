@@ -2,7 +2,7 @@ use crate::data::{Env, Ident, Lit, Toplevel, AST};
 use crate::evaluate::evaluate_expr;
 use crate::utils::concat;
 
-use crate::monocheck::Monotype;
+use crate::check::Monotype;
 
 fn expand_expr(expr: AST, environment: Env<AST>) -> Result<AST, String> {
     match expr {
