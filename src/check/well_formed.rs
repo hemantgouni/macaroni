@@ -1,29 +1,29 @@
 #![allow(dead_code)]
 #![allow(unused_variables)]
 
-use crate::check::ordered_env::{OrderedEnv, OrderedEnvElem};
+use crate::check::ordered_env::{OrdEnv, OrdEnvElem};
 use crate::check::{Monotype, Type, TypeError};
 
-pub fn well_formed(typ: Type, env: OrderedEnv) -> Result<(), TypeError> {
+pub fn well_formed(typ: Type, env: OrdEnv) -> Result<(), TypeError> {
     match typ {
         Type::Monotype(typ) => match typ {
             // UvarWF
             Monotype::UVar(uvar) => {
-                if env.contains(&OrderedEnvElem::UVar(uvar.clone())) {
+                if env.contains(&OrdEnvElem::UVar(uvar.clone())) {
                     Ok(())
                 } else {
-                    Err(TypeError::UVarLookupFailure(uvar))
+                    Err(TypeError::UVarNotFound(uvar))
                 }
             }
             // EvarWF, SolvedEvarWF
             Monotype::EVar(evar) => {
                 if env.contains_pred(|elem| {
-                    elem == &OrderedEnvElem::EVar(evar.clone())
-                        || matches!(elem, OrderedEnvElem::ESol(evar, _))
+                    elem == &OrdEnvElem::EVar(evar.clone())
+                        || matches!(elem, OrdEnvElem::ESol(evar, _))
                 }) {
                     Ok(())
                 } else {
-                    Err(TypeError::EVarLookupFailure(evar))
+                    Err(TypeError::EVarNotFound(evar))
                 }
             }
             Monotype::Bottom
@@ -46,6 +46,11 @@ pub fn well_formed(typ: Type, env: OrderedEnv) -> Result<(), TypeError> {
         // Recurse into the argument type to check well-formedness
         Type::List(typ) => well_formed(*typ, env),
         // ForallWF
-        Type::Forall(uvar, typ) => well_formed(*typ, env.add(OrderedEnvElem::UVar(uvar))),
+        Type::Forall(uvar, typ) => well_formed(*typ, env.add(OrdEnvElem::UVar(uvar))),
     }
+}
+
+#[cfg(test)]
+mod test {
+    // TODO: actually write tests, after we've done some basic integration into instantiate
 }

@@ -1,8 +1,8 @@
 use crate::check::{EVar, Monotype, Type, UVar};
 use crate::data::Ident;
 
-#[derive(Debug, PartialEq, Clone)]
-pub enum OrderedEnvElem {
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub enum OrdEnvElem {
     UVar(UVar),
     TVar(Ident, Type),
     EVar(EVar),
@@ -11,14 +11,14 @@ pub enum OrderedEnvElem {
 }
 
 #[derive(Debug, Clone)]
-pub struct OrderedEnv(Vec<OrderedEnvElem>);
+pub struct OrdEnv(Vec<OrdEnvElem>);
 
-impl OrderedEnv {
+impl OrdEnv {
     pub fn new() -> Self {
-        OrderedEnv(Vec::new())
+        OrdEnv(Vec::new())
     }
 
-    pub fn add(&self, elem: OrderedEnvElem) -> Self {
+    pub fn add(&self, elem: OrdEnvElem) -> Self {
         let mut self_clone = self.clone();
         self_clone.0.push(elem);
         self_clone
@@ -31,23 +31,23 @@ impl OrderedEnv {
         self_clone
     }
 
-    pub fn contains(&self, elem: &OrderedEnvElem) -> bool {
+    pub fn contains(&self, elem: &OrdEnvElem) -> bool {
         self.0.contains(elem)
     }
 
     // what's with the reference weirdness here
-    pub fn contains_pred(&self, pred: impl Fn(&OrderedEnvElem) -> bool) -> bool {
+    pub fn contains_pred(&self, pred: impl Fn(&OrdEnvElem) -> bool) -> bool {
         self.0.iter().find(|elem| pred(elem)).is_some()
     }
 
-    pub fn split_on(&self, elem: &OrderedEnvElem) -> Option<(Self, OrderedEnvElem, Self)> {
+    pub fn split_on(&self, elem: &OrdEnvElem) -> Option<(Self, OrdEnvElem, Self)> {
         self.0
             .iter()
             .position(|elem_in_vec| elem_in_vec == elem)
             .map(|pos| {
                 let split = self.0.split_at(pos);
-                let env_left = OrderedEnv(split.0.to_vec());
-                let env_right = OrderedEnv(split.1[1..].to_vec());
+                let env_left = OrdEnv(split.0.to_vec());
+                let env_right = OrdEnv(split.1[1..].to_vec());
 
                 (env_left, split.1[0].to_owned(), env_right)
             })

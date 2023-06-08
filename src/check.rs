@@ -5,6 +5,7 @@ mod ordered_env;
 mod well_formed;
 
 use crate::data::{Env, Ident, Lit, Toplevel, AST};
+use crate::check::ordered_env::OrdEnvElem;
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct UVar(pub String);
@@ -82,9 +83,10 @@ pub struct Given(Type);
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum TypeError {
     Mismatch(Expected, Given),
-    LookupFailure(Ident),
-    UVarLookupFailure(UVar),
-    EVarLookupFailure(EVar),
+    TVarNotFound(Ident),
+    UVarNotFound(UVar),
+    EVarNotFound(EVar),
+    OrdEnvElemNotFound(OrdEnvElem),
 }
 
 fn infer_lit(expr: Lit) -> Result<Type, TypeError> {
@@ -183,7 +185,7 @@ fn infer_expr(expr: AST, env: Env<Type>) -> Result<Type, TypeError> {
         },
         AST::Var(ident) => env
             .lookup(&ident)
-            .map_err(|_| TypeError::LookupFailure(ident)),
+            .map_err(|_| TypeError::TVarNotFound(ident)),
         AST::App(lambda, args) => match infer_expr(*lambda, env.clone())? {
             Type::Func(arg_types, res_type) => arg_types.clone().iter().zip(args.iter()).fold(
                 Ok(Type::Func(arg_types, res_type)),
@@ -207,7 +209,7 @@ fn infer_expr(expr: AST, env: Env<Type>) -> Result<Type, TypeError> {
         AST::Call(name, args) => {
             let func_sig = env
                 .lookup(&name)
-                .map_err(|_| TypeError::LookupFailure(name))?;
+                .map_err(|_| TypeError::TVarNotFound(name))?;
 
             match func_sig {
                 Type::Func(arg_types, res_type) => args.iter().zip(arg_types.iter()).fold(
@@ -303,7 +305,7 @@ fn check_top(exprs: Vec<AST>, mut env: Env<Type>) -> Result<(), TypeError> {
             func.to_owned(),
             env.clone(),
             env.lookup(name)
-                .map_err(|_| TypeError::LookupFailure(name.to_owned()))?,
+                .map_err(|_| TypeError::TVarNotFound(name.to_owned()))?,
         ) {
             Ok(()) => check_top(rest.to_vec(), env.to_owned()),
             other => other,
@@ -913,7 +915,7 @@ mod test {
         let result = dbg!(check_top(ast, Env::new()));
 
         assert_eq!(
-            Err(TypeError::LookupFailure(Ident(
+            Err(TypeError::TVarNotFound(Ident(
                 "function-doesnt-exist".to_string()
             ))),
             result
