@@ -10,8 +10,8 @@ pub enum OrdEnvElem {
     Marker(EVar),
 }
 
-#[derive(Debug, Clone)]
-pub struct OrdEnv(Vec<OrdEnvElem>);
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub struct OrdEnv(pub Vec<OrdEnvElem>);
 
 impl OrdEnv {
     pub fn new() -> Self {
