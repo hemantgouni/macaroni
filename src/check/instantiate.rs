@@ -18,7 +18,7 @@ fn instantiate_left(left: EVar, right: Type, env: OrderedEnv) -> Result<OrderedE
         // InstLArr
         Type::Func(arg_types, res_type) => todo!(),
         // InstLAllR
-        Type::Forall(typ) => todo!(),
+        Type::Forall(uvar, typ) => todo!(),
         _ => todo!(),
     }
 }

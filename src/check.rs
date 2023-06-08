@@ -14,7 +14,7 @@ pub struct EVar(pub String);
 
 #[derive(Debug, Eq, Clone)]
 pub enum Type {
-    Forall(Box<Type>),
+    Forall(UVar, Box<Type>),
     List(Box<Type>),
     Func(Vec<Type>, Box<Type>),
     Monotype(Monotype),
@@ -28,7 +28,11 @@ impl PartialEq for Type {
             (Type::Monotype(Monotype::Bottom), _) => true,
             (_, Type::Monotype(Monotype::Bottom)) => true,
             // TODO: is this right?
-            (Type::Forall(typ1), Type::Forall(typ2)) if typ1 == typ2 => true,
+            (Type::Forall(uvar1, typ1), Type::Forall(uvar2, typ2))
+                if uvar1 == uvar2 && typ1 == typ2 =>
+            {
+                true
+            }
             (Type::List(typ1), Type::List(typ2)) if typ1 == typ2 => true,
             (Type::Func(arg_typ1, res_typ1), Type::Func(arg_typ2, res_typ2))
                 if arg_typ1 == arg_typ2 && res_typ1 == res_typ2 =>
@@ -50,8 +54,6 @@ pub enum Monotype {
     Bool,
     String,
     Symbol,
-    List(Box<Monotype>),
-    Func(Vec<Monotype>, Box<Monotype>),
 }
 
 impl PartialEq for Monotype {
@@ -66,12 +68,6 @@ impl PartialEq for Monotype {
             (Monotype::Bool, Monotype::Bool) => true,
             (Monotype::String, Monotype::String) => true,
             (Monotype::Symbol, Monotype::Symbol) => true,
-            (Monotype::List(ty1), Monotype::List(ty2)) if ty1 == ty2 => true,
-            (Monotype::Func(arg_ty1, ret_ty1), Monotype::Func(arg_ty2, ret_ty2))
-                if arg_ty1 == arg_ty2 && ret_ty1 == ret_ty2 =>
-            {
-                true
-            }
             _ => false,
         }
     }
@@ -87,6 +83,8 @@ pub struct Given(Type);
 pub enum TypeError {
     Mismatch(Expected, Given),
     LookupFailure(Ident),
+    UVarLookupFailure(UVar),
+    EVarLookupFailure(EVar),
 }
 
 fn infer_lit(expr: Lit) -> Result<Type, TypeError> {
