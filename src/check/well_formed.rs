@@ -26,6 +26,20 @@ pub fn well_formed(typ: Type, env: OrdEnv) -> Result<(), TypeError> {
                     Err(TypeError::EVarNotFound(evar))
                 }
             }
+            Monotype::Func(mut arg_types, res_type) => {
+                arg_types.push(*res_type);
+
+                arg_types.iter().fold(Ok(()), |prev_res, typ| {
+                    match (
+                        prev_res,
+                        well_formed(Type::Monotype(typ.to_owned()), env.to_owned()),
+                    ) {
+                        (Ok(()), res) => res,
+                        (Err(type_err), _) => Err(type_err),
+                    }
+                })
+            }
+            Monotype::List(typ) => well_formed(Type::Monotype(*typ), env),
             Monotype::Bottom
             | Monotype::I64
             | Monotype::Bool

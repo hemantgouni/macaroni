@@ -30,8 +30,6 @@ impl OrdEnv {
     pub fn update(&self, target: &OrdEnvElem, elem: OrdEnvElem) -> Option<Self> {
         assert!(!self.contains(&elem));
 
-        dbg!(self);
-
         self.0
             .iter()
             .position(|self_elem| self_elem == target)

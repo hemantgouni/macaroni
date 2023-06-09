@@ -55,6 +55,8 @@ pub enum Monotype {
     Bool,
     String,
     Symbol,
+    Func(Vec<Monotype>, Box<Monotype>),
+    List(Box<Monotype>),
 }
 
 impl PartialEq for Monotype {
@@ -69,6 +71,12 @@ impl PartialEq for Monotype {
             (Monotype::Bool, Monotype::Bool) => true,
             (Monotype::String, Monotype::String) => true,
             (Monotype::Symbol, Monotype::Symbol) => true,
+            (Monotype::List(typ1), Monotype::List(typ2)) if typ1 == typ2 => true,
+            (Monotype::Func(arg_typ1, res_typ1), Monotype::Func(arg_typ2, res_typ2))
+                if arg_typ1 == arg_typ2 && res_typ1 == res_typ2 =>
+            {
+                true
+            }
             _ => false,
         }
     }

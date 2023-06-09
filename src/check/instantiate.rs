@@ -1,9 +1,10 @@
-#![allow(unused_imports)]
 #![allow(unused_variables)]
 
 use crate::check::ordered_env::{OrdEnv, OrdEnvElem};
 use crate::check::well_formed::well_formed;
-use crate::check::{EVar, Monotype, Type, TypeError, UVar};
+use crate::check::{EVar, Monotype, Type, TypeError};
+
+use crate::utils::get_unique_id;
 
 fn instantiate_left(left: EVar, right: Type, env: OrdEnv) -> Result<OrdEnv, TypeError> {
     match right {
@@ -40,12 +41,21 @@ fn instantiate_left(left: EVar, right: Type, env: OrdEnv) -> Result<OrdEnv, Type
             ))),
         },
         // InstLArr
-        Type::Func(arg_types, res_type) => match env.split_on(&OrdEnvElem::EVar(left.clone())) {
-            Some((left_env, elem, right_env)) => todo!(),
-            _ => todo!(),
-        },
+        // Have to create a ton of existentials here
+        Type::Func(mut arg_types, res_type) => {
+            match env.split_on(&OrdEnvElem::EVar(left.clone())) {
+                Some((left_env, elem, right_env)) => {
+                    // arg_types.
+                    todo!()
+                }
+                None => Err(TypeError::OrdEnvElemNotFound(OrdEnvElem::EVar(
+                    left.clone(),
+                ))),
+            }
+        }
         // InstLAllR
         Type::Forall(uvar, typ) => todo!(),
+        // InstLList?
         _ => todo!(),
     }
 }
@@ -54,6 +64,7 @@ fn instantiate_left(left: EVar, right: Type, env: OrdEnv) -> Result<OrdEnv, Type
 #[cfg(test)]
 mod test {
     use super::*;
+    use crate::check::UVar;
 
     #[test]
     fn test_InstLSolve() {

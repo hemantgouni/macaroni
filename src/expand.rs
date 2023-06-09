@@ -1,6 +1,6 @@
 use crate::data::{Env, Ident, Lit, Toplevel, AST};
 use crate::evaluate::evaluate_expr;
-use crate::utils::concat;
+use crate::utils::VecUtils;
 
 use crate::check::Type;
 
@@ -19,7 +19,7 @@ fn expand_expr(expr: AST, environment: Env<AST>) -> Result<AST, String> {
             Box::new(expand_expr(*lambda, environment)?),
             args.iter()
                 .fold(Ok(Vec::new()), |res: Result<Vec<AST>, String>, arg| {
-                    res.map(|exp_arg| concat(exp_arg, vec![arg.clone()]))
+                    res.map(|exp_arg| exp_arg.append_immutable(&vec![arg.clone()]))
                 })?,
         )),
         AST::MacroCall(ident, actual_args) => match environment.lookup(&ident) {
@@ -64,14 +64,13 @@ fn expand_expr(expr: AST, environment: Env<AST>) -> Result<AST, String> {
                 actual_args.iter().fold(
                     Ok(vec![]),
                     |arg_vec: Result<Vec<AST>, String>, expr: &Lit| {
-                        Ok(concat(
+                        Ok(
                             // TODO: order matters here; see if we made this mistake anywhere else!!
-                            arg_vec?,
-                            vec![expand_expr(
+                            arg_vec?.append_immutable(&vec![expand_expr(
                                 expr.clone().to_elem().parse(),
                                 environment.clone(),
-                            )?],
-                        ))
+                            )?]),
+                        )
                     },
                 )?,
             )),
@@ -82,10 +81,7 @@ fn expand_expr(expr: AST, environment: Env<AST>) -> Result<AST, String> {
             actual_args.iter().fold(
                 Ok(Vec::new()),
                 |args: Result<Vec<AST>, String>, arg: &AST| {
-                    Ok(concat(
-                        args?,
-                        vec![expand_expr(arg.to_owned(), environment.clone())?],
-                    ))
+                    Ok(args?.append_immutable(&vec![expand_expr(arg.to_owned(), environment.clone())?]))
                 },
             )?,
         )),
@@ -235,13 +231,10 @@ fn expand_top(forms: Vec<AST>, mut out_env: Env<AST>) -> Result<Vec<AST>, String
                 ),
             );
 
-            Ok(concat(
-                vec![expanded_func.to_owned()],
-                expand_top(
-                    rest.to_vec(),
-                    out_env.insert(ident.to_owned(), expanded_func),
-                )?,
-            ))
+            Ok(vec![expanded_func.to_owned()].append_immutable(&expand_top(
+                rest.to_vec(),
+                out_env.insert(ident.to_owned(), expanded_func),
+            )?))
         }
         [AST::Macro(ident, args, body), rest @ ..] => {
             // let rewrite_to_ident: fn(AST) -> AST = |ast: AST| match ast {
@@ -275,18 +268,14 @@ fn expand_top(forms: Vec<AST>, mut out_env: Env<AST>) -> Result<Vec<AST>, String
                 Box::new(expand_expr(*body.to_owned(), out_env.clone())?.rewrite()),
             );
 
-            Ok(concat(
-                vec![expanded_func.to_owned()],
-                expand_top(
-                    rest.to_vec(),
-                    out_env.insert(ident.to_owned(), expanded_func),
-                )?,
-            ))
+            Ok(vec![expanded_func.to_owned()].append_immutable(&expand_top(
+                rest.to_vec(),
+                out_env.insert(ident.to_owned(), expanded_func),
+            )?))
         }
-        [func_type_dec @ AST::TypeDec(.., Type::Func(..)), rest @ ..] => Ok(concat(
-            vec![func_type_dec.to_owned()],
-            expand_top(rest.to_vec(), out_env)?,
-        )),
+        [func_type_dec @ AST::TypeDec(.., Type::Func(..)), rest @ ..] => {
+            Ok(vec![func_type_dec.to_owned()].append_immutable(&expand_top(rest.to_vec(), out_env)?))
+        }
         [expr, ..] => Ok(vec![expand_expr(expr.to_owned(), out_env)?.rewrite()]),
         [] => Err(
             "expand_top either didn't find any top-level forms or a runnable expr. This is a bug!"
