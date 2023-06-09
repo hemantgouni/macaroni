@@ -40,7 +40,10 @@ fn instantiate_left(left: EVar, right: Type, env: OrdEnv) -> Result<OrdEnv, Type
             ))),
         },
         // InstLArr
-        Type::Func(arg_types, res_type) => todo!(),
+        Type::Func(arg_types, res_type) => match env.split_on(&OrdEnvElem::EVar(left.clone())) {
+            Some((left_env, elem, right_env)) => todo!(),
+            _ => todo!(),
+        },
         // InstLAllR
         Type::Forall(uvar, typ) => todo!(),
         _ => todo!(),
