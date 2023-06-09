@@ -55,8 +55,8 @@ pub enum Monotype {
     Bool,
     String,
     Symbol,
-    Func(Vec<Monotype>, Box<Monotype>),
     List(Box<Monotype>),
+    Func(Vec<Monotype>, Box<Monotype>),
 }
 
 impl PartialEq for Monotype {

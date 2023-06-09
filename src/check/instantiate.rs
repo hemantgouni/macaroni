@@ -42,22 +42,62 @@ fn instantiate_left(left: EVar, right: Type, env: OrdEnv) -> Result<OrdEnv, Type
         },
         // InstLArr
         // Have to create a ton of existentials here
-        Type::Func(mut arg_types, res_type) => {
-            match env.split_on(&OrdEnvElem::EVar(left.clone())) {
-                Some((left_env, elem, right_env)) => {
-                    // arg_types.
-                    todo!()
-                }
-                None => Err(TypeError::OrdEnvElemNotFound(OrdEnvElem::EVar(
-                    left.clone(),
-                ))),
+        Type::Func(arg_types, res_type) => match env.split_on(&OrdEnvElem::EVar(left.clone())) {
+            Some((left_env, elem, right_env)) => {
+                let arg_pairs: Vec<(&Type, EVar)> = arg_types
+                    .iter()
+                    .map(|arg_type| (arg_type, EVar(get_unique_id())))
+                    .collect();
+
+                let res_pair: (&Type, EVar) = (&*res_type, EVar(get_unique_id()));
+
+                let func_esol = OrdEnvElem::ESol(
+                    left,
+                    Monotype::Func(
+                        arg_pairs
+                            .iter()
+                            .map(|pair| Monotype::EVar(pair.1.clone()))
+                            .collect(),
+                        Box::new(Monotype::EVar(res_pair.1.to_owned())),
+                    ),
+                );
+
+                let env_to_insert = OrdEnv(
+                    arg_pairs
+                        .iter()
+                        .map(|pair| OrdEnvElem::EVar(pair.1.clone()))
+                        .collect(),
+                )
+                .add(func_esol);
+
+                let new_env_initial = left_env.concat(&env_to_insert).concat(&right_env);
+
+                // remember to substitute using env! add this to OrdEnv
+                arg_pairs
+                    .iter()
+                    .fold(
+                        Ok(new_env_initial),
+                        |env_or_err: Result<OrdEnv, TypeError>, pair| {
+                            instantiate_right(pair.0.to_owned(), pair.1.to_owned(), env_or_err?)
+                        },
+                    )
+                    .and_then(|out_env| {
+                        instantiate_left(res_pair.1, res_pair.0.to_owned(), out_env)
+                    })
             }
-        }
+            None => Err(TypeError::OrdEnvElemNotFound(OrdEnvElem::EVar(
+                left.clone(),
+            ))),
+        },
         // InstLAllR
         Type::Forall(uvar, typ) => todo!(),
         // InstLList?
-        _ => todo!(),
+        Type::List(typ) => todo!(),
     }
+}
+
+fn instantiate_right(right: Type, left: EVar, env: OrdEnv) -> Result<OrdEnv, TypeError> {
+    todo!()
 }
 
 #[allow(non_snake_case)]

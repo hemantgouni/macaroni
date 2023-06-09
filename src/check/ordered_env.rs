@@ -68,6 +68,53 @@ impl OrdEnv {
                 (env_left, split.1[0].to_owned(), env_right)
             })
     }
+
+    fn sol_for_evar(&self, evar: EVar) -> Option<OrdEnvElem> {
+        self.0
+            .iter()
+            .find(|env_elem| match env_elem {
+                OrdEnvElem::ESol(cand_evar, _) if cand_evar == &evar => true,
+                _ => false,
+            })
+            .map(|esol| esol.to_owned())
+    }
+
+    fn substitute_mono(&self, typ: Monotype) -> Monotype {
+        match typ {
+            Monotype::UVar(..)
+            | Monotype::I64
+            | Monotype::String
+            | Monotype::Symbol
+            | Monotype::Bool
+            | Monotype::Bottom => typ,
+            Monotype::EVar(ref evar) => match self.sol_for_evar(evar.clone()) {
+                Some(OrdEnvElem::ESol(_, monotype)) => monotype,
+                _ => typ,
+            },
+            Monotype::Func(args, res) => Monotype::Func(
+                args.iter()
+                    .map(|arg| self.substitute_mono(arg.to_owned()))
+                    .collect(),
+                Box::new(self.substitute_mono(*res)),
+            ),
+            Monotype::List(typ) => self.substitute_mono(*typ),
+        }
+    }
+
+    pub fn substitute(&self, typ: Type) -> Type {
+        match typ {
+            Type::Forall(uvar, typ) => Type::Forall(uvar, Box::new(self.substitute(*typ))),
+            Type::List(typ) => self.substitute(*typ),
+            Type::Func(arg_types, res_type) => Type::Func(
+                arg_types
+                    .iter()
+                    .map(|typ| self.substitute(typ.to_owned()))
+                    .collect(),
+                Box::new(self.substitute(*res_type)),
+            ),
+            Type::Monotype(monotype) => Type::Monotype(self.substitute_mono(monotype)),
+        }
+    }
 }
 
 #[cfg(test)]
