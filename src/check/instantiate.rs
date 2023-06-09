@@ -78,11 +78,20 @@ fn instantiate_left(left: EVar, right: Type, env: OrdEnv) -> Result<OrdEnv, Type
                     .fold(
                         Ok(new_env_initial),
                         |env_or_err: Result<OrdEnv, TypeError>, pair| {
-                            instantiate_right(pair.0.to_owned(), pair.1.to_owned(), env_or_err?)
+                            let in_env = env_or_err?;
+                            instantiate_right(
+                                in_env.substitute(pair.0.to_owned()),
+                                pair.1.to_owned(),
+                                in_env,
+                            )
                         },
                     )
-                    .and_then(|out_env| {
-                        instantiate_left(res_pair.1, res_pair.0.to_owned(), out_env)
+                    .and_then(|in_env| {
+                        instantiate_left(
+                            res_pair.1,
+                            in_env.substitute(res_pair.0.to_owned()),
+                            in_env,
+                        )
                     })
             }
             None => Err(TypeError::OrdEnvElemNotFound(OrdEnvElem::EVar(
