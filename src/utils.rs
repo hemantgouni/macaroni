@@ -38,7 +38,7 @@ pub fn get_unique_id() -> String {
     static COUNTER: AtomicUsize = AtomicUsize::new(1);
 
     let mut num_string = COUNTER.fetch_add(1, Ordering::Relaxed).to_string();
-    num_string.insert_str(0, "#");
+    num_string.insert(0, '#');
 
     num_string
 }

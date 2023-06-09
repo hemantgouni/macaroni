@@ -15,7 +15,7 @@ use crate::data::Toplevel;
 // we have parser combinators which are a bunch of functions that make it easier to write parsers,
 // what about the same thing for type checkers?
 
-fn print_separator() -> () {
+fn print_separator() {
     println!("\n=======================================================\n");
 }
 

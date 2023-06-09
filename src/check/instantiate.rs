@@ -36,9 +36,7 @@ fn instantiate_left(left: EVar, right: Type, env: OrdEnv) -> Result<OrdEnv, Type
                         _ => Err(typ_err),
                     })
             }
-            None => Err(TypeError::OrdEnvElemNotFound(OrdEnvElem::EVar(
-                left.clone(),
-            ))),
+            None => Err(TypeError::OrdEnvElemNotFound(OrdEnvElem::EVar(left))),
         },
         // InstLArr
         // Have to create a ton of existentials here
@@ -94,12 +92,21 @@ fn instantiate_left(left: EVar, right: Type, env: OrdEnv) -> Result<OrdEnv, Type
                         )
                     })
             }
-            None => Err(TypeError::OrdEnvElemNotFound(OrdEnvElem::EVar(
-                left.clone(),
-            ))),
+            None => Err(TypeError::OrdEnvElemNotFound(OrdEnvElem::EVar(left))),
         },
         // InstLAllR
-        Type::Forall(uvar, typ) => todo!(),
+        Type::Forall(uvar, typ) => {
+            if env.contains(&OrdEnvElem::EVar(left.clone())) {
+                instantiate_left(left.clone(), *typ, env.add(OrdEnvElem::UVar(uvar.clone()))).map(
+                    |out_env| match out_env.split_on(&OrdEnvElem::UVar(uvar)) {
+                        Some((left_env, elem, right_env)) => left_env,
+                        None => panic!("The variable we inserted wasn't found. This is a bug!."),
+                    },
+                )
+            } else {
+                Err(TypeError::OrdEnvElemNotFound(OrdEnvElem::EVar(left)))
+            }
+        }
         // InstLList?
         Type::List(typ) => todo!(),
     }
