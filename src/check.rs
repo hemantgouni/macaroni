@@ -4,8 +4,8 @@ mod instantiate;
 mod ordered_env;
 mod well_formed;
 
-use crate::data::{Env, Ident, Lit, Toplevel, AST};
 use crate::check::ordered_env::OrdEnvElem;
+use crate::data::{Env, Ident, Lit, Toplevel, AST};
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct UVar(pub String);
@@ -87,6 +87,7 @@ pub enum TypeError {
     UVarNotFound(UVar),
     EVarNotFound(EVar),
     OrdEnvElemNotFound(OrdEnvElem),
+    Message(String),
 }
 
 fn infer_lit(expr: Lit) -> Result<Type, TypeError> {

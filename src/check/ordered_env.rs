@@ -19,9 +19,27 @@ impl OrdEnv {
     }
 
     pub fn add(&self, elem: OrdEnvElem) -> Self {
+        // Ensuring no duplicate entries
+        assert!(!self.contains(&elem));
+
         let mut self_clone = self.clone();
         self_clone.0.push(elem);
         self_clone
+    }
+
+    pub fn update(&self, target: &OrdEnvElem, elem: OrdEnvElem) -> Option<Self> {
+        assert!(!self.contains(&elem));
+
+        dbg!(self);
+
+        self.0
+            .iter()
+            .position(|self_elem| self_elem == target)
+            .map(|pos| {
+                let mut self_clone = self.clone();
+                self_clone.0[pos] = elem;
+                self_clone
+            })
     }
 
     pub fn concat(&self, other_env: &Self) -> Self {
