@@ -319,7 +319,10 @@ mod test {
         );
 
         match result.unwrap().0.as_slice() {
-            [OrdEnvElem::EVar(evar1), OrdEnvElem::ESol(evar2, Monotype::EVar(evar3)), OrdEnvElem::ESol(evar_alpha, Monotype::Func(args, res))] =>
+            #[rustfmt::skip]
+            [OrdEnvElem::EVar(evar1),
+             OrdEnvElem::ESol(evar2, Monotype::EVar(evar3)),
+             OrdEnvElem::ESol(evar_alpha, Monotype::Func(args, res))] =>
             {
                 assert!(evar1 == evar3);
                 match (args.as_slice(), *res.clone()) {
