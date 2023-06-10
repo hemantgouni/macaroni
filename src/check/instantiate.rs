@@ -70,7 +70,6 @@ fn instantiate_left(left: EVar, right: Type, env: OrdEnv) -> Result<OrdEnv, Type
 
                 let new_env_initial = left_env.concat(&env_to_insert).concat(&right_env);
 
-                // remember to substitute using env! add this to OrdEnv
                 arg_pairs
                     .iter()
                     .fold(
@@ -107,13 +106,13 @@ fn instantiate_left(left: EVar, right: Type, env: OrdEnv) -> Result<OrdEnv, Type
                 Err(TypeError::OrdEnvElemNotFound(OrdEnvElem::EVar(left)))
             }
         }
-        // InstLList?
-        Type::List(typ) => todo!(),
     }
 }
 
 fn instantiate_right(right: Type, left: EVar, env: OrdEnv) -> Result<OrdEnv, TypeError> {
-    todo!()
+    match right {
+        _ => todo!(),
+    }
 }
 
 #[allow(non_snake_case)]

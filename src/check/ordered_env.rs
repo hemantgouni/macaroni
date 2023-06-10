@@ -104,7 +104,6 @@ impl OrdEnv {
     pub fn substitute(&self, typ: Type) -> Type {
         match typ {
             Type::Forall(uvar, typ) => Type::Forall(uvar, Box::new(self.substitute(*typ))),
-            Type::List(typ) => self.substitute(*typ),
             Type::Func(arg_types, res_type) => Type::Func(
                 arg_types
                     .iter()

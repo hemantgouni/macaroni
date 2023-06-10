@@ -10,22 +10,36 @@ fn quote_elem(elem: &Elem<String>) -> Lit {
     }
 }
 
+fn parse_monotype(elem: &Elem<String>) -> Monotype {
+    match elem {
+        Elem::Symbol(str) if str == "I64" => Monotype::I64,
+        Elem::Symbol(str) if str == "Bool" => Monotype::Bool,
+        Elem::Symbol(str) if str == "String" => Monotype::String,
+        Elem::Symbol(str) => Monotype::UVar(UVar(str.to_string())),
+        Elem::List(elems) => match elems.as_slice() {
+            [Elem::Symbol(str), typ] if str == "List" => {
+                Monotype::List(Box::new(parse_monotype(typ)))
+            }
+            // TODO: add tests for function type parsing
+            other => panic!("Invalid type: {:?}", other),
+        },
+        other => panic!("Invalid type: {:?}", other),
+    }
+}
+
 fn parse_type(elem: &Elem<String>) -> Type {
     match elem {
-        Elem::Symbol(str) if str == "I64" => Type::Monotype(Monotype::I64),
-        Elem::Symbol(str) if str == "Bool" => Type::Monotype(Monotype::Bool),
-        Elem::Symbol(str) if str == "String" => Type::Monotype(Monotype::String),
-        Elem::Symbol(str) => Type::Monotype(Monotype::UVar(UVar(str.to_string()))),
         Elem::List(elems) => match elems.as_slice() {
-            [Elem::Symbol(str), typ] if str == "List" => Type::List(Box::new(parse_type(typ))),
-            // TODO: add tests for function type parsing
+            [Elem::Symbol(str), Elem::Symbol(var), typ] if str == "forall" => {
+                Type::Forall(UVar(var.to_string()), Box::new(parse_type(typ)))
+            }
             [Elem::Symbol(str), Elem::List(arg_types), body_type] if str == "->" => Type::Func(
                 arg_types.iter().map(parse_type).collect(),
                 Box::new(parse_type(body_type)),
             ),
-            other => panic!("Invalid type: {:?}", other),
+            _ => Type::Monotype(parse_monotype(elem)),
         },
-        other => panic!("Invalid type: {:?}", other),
+        _ => Type::Monotype(parse_monotype(elem)),
     }
 }
 

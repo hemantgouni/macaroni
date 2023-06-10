@@ -6,6 +6,7 @@ mod well_formed;
 
 use crate::check::ordered_env::OrdEnvElem;
 use crate::data::{Env, Ident, Lit, Toplevel, AST};
+use crate::utils::VecUtils;
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct UVar(pub String);
@@ -16,7 +17,8 @@ pub struct EVar(pub String);
 #[derive(Debug, Eq, Clone)]
 pub enum Type {
     Forall(UVar, Box<Type>),
-    List(Box<Type>),
+    // We can't instantiate this type to one that contains a forall without impredicativity!
+    // List(Box<Type>),
     Func(Vec<Type>, Box<Type>),
     Monotype(Monotype),
 }
@@ -34,7 +36,7 @@ impl PartialEq for Type {
             {
                 true
             }
-            (Type::List(typ1), Type::List(typ2)) if typ1 == typ2 => true,
+            // (Type::List(typ1), Type::List(typ2)) if typ1 == typ2 => true,
             (Type::Func(arg_typ1, res_typ1), Type::Func(arg_typ2, res_typ2))
                 if arg_typ1 == arg_typ2 && res_typ1 == res_typ2 =>
             {
@@ -95,35 +97,48 @@ pub enum TypeError {
     UVarNotFound(UVar),
     EVarNotFound(EVar),
     OrdEnvElemNotFound(OrdEnvElem),
+    ImpredicativeForall(Type),
     Message(String),
 }
 
-fn infer_lit(expr: Lit) -> Result<Type, TypeError> {
+fn infer_lit(expr: Lit) -> Result<Monotype, TypeError> {
     match expr {
-        Lit::I64(_) => Ok(Type::Monotype(Monotype::I64)),
-        Lit::Bool(_) => Ok(Type::Monotype(Monotype::Bool)),
-        Lit::String(_) => Ok(Type::Monotype(Monotype::String)),
-        Lit::Symbol(_) => Ok(Type::Monotype(Monotype::Symbol)),
+        Lit::I64(_) => Ok(Monotype::I64),
+        Lit::Bool(_) => Ok(Monotype::Bool),
+        Lit::String(_) => Ok(Monotype::String),
+        Lit::Symbol(_) => Ok(Monotype::Symbol),
         Lit::List(lits) => lits
             .iter()
-            .fold(
-                Ok(Type::Monotype(Monotype::Bottom)),
-                |prev, next| match prev {
-                    Ok(ty) if ty != infer_lit(next.clone())? => Err(TypeError::Mismatch(
-                        Expected(ty),
-                        Given(infer_lit(next.clone())?),
-                    )),
-                    Ok(_) => Ok(infer_lit(next.clone())?),
-                    Err(_) => prev,
-                },
-            )
-            .map(|ty| Type::List(Box::new(ty))),
+            .fold(Ok(Monotype::Bottom), |prev, next| match prev {
+                Ok(ty) if ty != infer_lit(next.clone())? => Err(TypeError::Mismatch(
+                    Expected(Type::Monotype(ty)),
+                    Given(Type::Monotype(infer_lit(next.clone())?)),
+                )),
+                Ok(_) => Ok(infer_lit(next.clone())?),
+                Err(_) => prev,
+            })
+            .map(|ty| Monotype::List(Box::new(ty))),
+    }
+}
+
+fn list_impredicativity_check(typ: &Type) -> Result<Monotype, TypeError> {
+    match typ {
+        Type::Forall(..) => Err(TypeError::ImpredicativeForall(typ.to_owned())),
+        Type::Func(arg_types, res_type) => Ok(Monotype::Func(
+            arg_types
+                .iter()
+                .fold(Ok(Vec::new()), |arg_types_or_err, arg_type| {
+                    Ok(arg_types_or_err?.push_immutable(&list_impredicativity_check(arg_type)?))
+                })?,
+            Box::new(list_impredicativity_check(res_type)?),
+        )),
+        Type::Monotype(monotyp) => Ok(monotyp.to_owned()),
     }
 }
 
 fn infer_expr(expr: AST, env: Env<Type>) -> Result<Type, TypeError> {
     match expr {
-        AST::Lit(lit) => infer_lit(lit),
+        AST::Lit(lit) => Ok(Type::Monotype(infer_lit(lit)?)),
         AST::Type(ref ty, expr) => match check_expr(*expr, env, ty.clone()) {
             Ok(()) => Ok(ty.clone()),
             Err(tyerr) => Err(tyerr),
@@ -152,11 +167,13 @@ fn infer_expr(expr: AST, env: Env<Type>) -> Result<Type, TypeError> {
             }
         }
         AST::List(elems) => match elems.as_slice() {
-            [] => Ok(Type::List(Box::new(Type::Monotype(Monotype::Bottom)))),
+            [] => Ok(Type::Monotype(Monotype::List(Box::new(Monotype::Bottom)))),
             [first, rest @ ..] => {
                 let expected_elem_type: Type = infer_expr(first.clone(), env.clone())?;
                 rest.iter().fold(
-                    Ok(Type::List(Box::new(expected_elem_type.clone()))),
+                    Ok(Type::Monotype(Monotype::List(Box::new(
+                        list_impredicativity_check(&expected_elem_type.clone())?,
+                    )))),
                     |prev, next| match (
                         prev,
                         check_expr(next.clone(), env.clone(), expected_elem_type.clone()),
@@ -170,24 +187,32 @@ fn infer_expr(expr: AST, env: Env<Type>) -> Result<Type, TypeError> {
         },
         AST::Cons(elem, list) => {
             let ty = infer_expr(*elem, env.clone())?;
-            match check_expr(*list, env, Type::List(Box::new(ty.clone()))) {
-                Ok(()) => Ok(Type::List(Box::new(ty))),
+            match check_expr(
+                *list,
+                env,
+                Type::Monotype(Monotype::List(Box::new(list_impredicativity_check(
+                    &ty.clone(),
+                )?))),
+            ) {
+                Ok(()) => Ok(Type::Monotype(Monotype::List(Box::new(
+                    list_impredicativity_check(&ty)?,
+                )))),
                 Err(ty_err) => Err(ty_err),
             }
         }
         AST::Cdr(list) => infer_expr(*list, env),
         AST::Car(list) => match infer_expr(*list, env) {
-            Ok(Type::List(typ)) => Ok(*typ),
+            Ok(Type::Monotype(Monotype::List(typ))) => Ok(Type::Monotype(*typ)),
             Ok(typ) => Err(TypeError::Mismatch(
-                Expected(Type::List(Box::new(Type::Monotype(Monotype::Bottom)))),
+                Expected(Type::Monotype(Monotype::List(Box::new(Monotype::Bottom)))),
                 Given(typ),
             )),
             Err(typ_err) => Err(typ_err),
         },
         AST::Emptyp(list) => match infer_expr(*list, env) {
-            Ok(Type::List(_)) => Ok(Type::Monotype(Monotype::Bool)),
+            Ok(Type::Monotype(Monotype::List(_))) => Ok(Type::Monotype(Monotype::Bool)),
             Ok(typ) => Err(TypeError::Mismatch(
-                Expected(Type::List(Box::new(Type::Monotype(Monotype::Bottom)))),
+                Expected(Type::Monotype(Monotype::List(Box::new(Monotype::Bottom)))),
                 Given(typ),
             )),
             Err(typ_err) => Err(typ_err),
@@ -370,10 +395,7 @@ mod test {
 
         let result = infer_lit(lit);
 
-        assert_eq!(
-            result,
-            Ok(Type::List(Box::new(Type::Monotype(Monotype::I64))))
-        )
+        assert_eq!(result, Ok(Monotype::List(Box::new(Monotype::I64))))
     }
 
     #[test]
@@ -404,7 +426,7 @@ mod test {
 
         assert_eq!(
             result,
-            Ok(Type::List(Box::new(Type::Monotype(Monotype::I64))))
+            Ok(Monotype::List(Box::new(Monotype::I64)))
         )
     }
 
@@ -416,7 +438,7 @@ mod test {
 
         assert_eq!(
             result,
-            Ok(Type::List(Box::new(Type::Monotype(Monotype::I64))))
+            Ok(Monotype::List(Box::new(Monotype::I64)))
         )
     }
 
@@ -654,8 +676,8 @@ mod test {
         assert_eq!(
             result,
             Err(TypeError::Mismatch(
-                Expected(Type::List(Box::new(Type::Monotype(Monotype::String)))),
-                Given(Type::List(Box::new(Type::Monotype(Monotype::I64)))),
+                Expected(Type::Monotype(Monotype::List(Box::new(Monotype::String)))),
+                Given(Type::Monotype(Monotype::List(Box::new(Monotype::I64)))),
             ))
         )
     }
@@ -745,8 +767,8 @@ mod test {
         assert_eq!(
             result,
             Err(TypeError::Mismatch(
-                Expected(Type::List(Box::new(Type::Monotype(Monotype::String)))),
-                Given(Type::List(Box::new(Type::Monotype(Monotype::I64))))
+                Expected(Type::Monotype(Monotype::List(Box::new(Monotype::String)))),
+                Given(Type::Monotype(Monotype::List(Box::new(Monotype::I64))))
             ))
         )
     }

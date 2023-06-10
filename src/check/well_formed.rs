@@ -57,8 +57,6 @@ pub fn well_formed(typ: Type, env: OrdEnv) -> Result<(), TypeError> {
                 }
             })
         }
-        // Recurse into the argument type to check well-formedness
-        Type::List(typ) => well_formed(*typ, env),
         // ForallWF
         Type::Forall(uvar, typ) => well_formed(*typ, env.add(OrdEnvElem::UVar(uvar))),
     }
