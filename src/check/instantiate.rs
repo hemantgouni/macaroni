@@ -66,6 +66,7 @@ fn instantiate_left(left: EVar, right: Type, env: OrdEnv) -> Result<OrdEnv, Type
                                 .map(|pair| OrdEnvElem::EVar(pair.1.clone()))
                                 .collect(),
                         )
+                        .add(OrdEnvElem::EVar(res_pair.1.clone()))
                         .add(func_esol),
                     )
                     .concat(&right_env);
@@ -142,9 +143,12 @@ fn instantiate_right(left: Type, right: EVar, env: OrdEnv) -> Result<OrdEnv, Typ
                                 .map(|pair| OrdEnvElem::EVar(pair.1.clone()))
                                 .collect(),
                         )
+                        .add(OrdEnvElem::EVar(res_pair.1.clone()))
                         .add(func_esol),
                     )
                     .concat(&right_env);
+
+                dbg!(new_env_init.clone());
 
                 arg_pairs
                     .iter()
@@ -176,9 +180,11 @@ fn instantiate_right(left: Type, right: EVar, env: OrdEnv) -> Result<OrdEnv, Typ
                     .add(OrdEnvElem::Marker(EVar(name.clone())))
                     .add(OrdEnvElem::EVar(EVar(name.clone())));
 
+                dbg!(new_env_init.clone());
+
                 instantiate_right(
-                    typ.substitute(&UVar(name.clone()), &EVar(name.clone())),
-                    right,
+                    dbg!(typ.substitute(&UVar(name.clone()), &EVar(name.clone()))),
+                    dbg!(right),
                     new_env_init,
                 )?
                 .split_on(&OrdEnvElem::Marker(EVar(name.clone())))
@@ -278,5 +284,54 @@ mod test {
                 )
             ]))
         );
+    }
+
+    #[test]
+    fn test_InstRAllL_1() {
+        let input_env = OrdEnv(vec![OrdEnvElem::EVar(EVar("beta".to_string()))]);
+
+        let result = instantiate_right(
+            Type::Forall(
+                UVar("alpha".to_string()),
+                Box::new(Type::Monotype(Monotype::UVar(UVar("alpha".to_string())))),
+            ),
+            EVar("beta".to_string()),
+            input_env.clone(),
+        );
+
+        assert_eq!(result, Ok(input_env))
+    }
+
+    #[test]
+    fn test_InstRAllL_2() {
+        let input_env = OrdEnv(vec![OrdEnvElem::EVar(EVar("alpha".to_string()))]);
+
+        let result = instantiate_right(
+            Type::Forall(
+                UVar("beta".to_string()),
+                Box::new(Type::Func(
+                    vec![Type::Monotype(Monotype::UVar(UVar("beta".to_string())))],
+                    Box::new(Type::Monotype(Monotype::UVar(UVar("beta".to_string())))),
+                )),
+            ),
+            EVar("alpha".to_string()),
+            input_env,
+        );
+
+        match result.unwrap().0.as_slice() {
+            [OrdEnvElem::EVar(evar1), OrdEnvElem::ESol(evar2, Monotype::EVar(evar3)), OrdEnvElem::ESol(evar_alpha, Monotype::Func(args, res))] =>
+            {
+                assert!(evar1 == evar3);
+                match (args.as_slice(), *res.clone()) {
+                    ([Monotype::EVar(evar4)], Monotype::EVar(evar5)) => {
+                        assert!(evar1 == evar4);
+                        assert!(evar2 == &evar5);
+                        assert!(matches!(evar_alpha, EVar(name) if name == "alpha"));
+                    }
+                    _ => panic!("Function argument or result did not take the expected form!"),
+                }
+            }
+            _ => panic!("Final output environment did not take the expected form!"),
+        }
     }
 }
