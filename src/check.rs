@@ -48,6 +48,28 @@ impl PartialEq for Type {
     }
 }
 
+impl Type {
+    pub fn substitute(&self, target: &UVar, replacement: &EVar) -> Self {
+        match self {
+            Type::Forall(uvar, _) if target == uvar => {
+                panic!("Misguided attempt to replace unfree uvar!")
+            }
+            Type::Forall(uvar, typ) => Type::Forall(
+                uvar.to_owned(),
+                Box::new((*typ).substitute(target, replacement)),
+            ),
+            Type::Func(arg_types, res_type) => Type::Func(
+                arg_types
+                    .iter()
+                    .map(|arg_type| arg_type.substitute(target, replacement))
+                    .collect(),
+                Box::new(res_type.substitute(target, replacement)),
+            ),
+            Type::Monotype(monotype) => Type::Monotype(monotype.substitute(target, replacement)),
+        }
+    }
+}
+
 #[derive(Debug, Eq, Clone)]
 pub enum Monotype {
     Bottom,
@@ -59,6 +81,25 @@ pub enum Monotype {
     Symbol,
     List(Box<Monotype>),
     Func(Vec<Monotype>, Box<Monotype>),
+}
+
+impl Monotype {
+    fn substitute(&self, target: &UVar, replacement: &EVar) -> Self {
+        match self {
+            Monotype::UVar(uvar) if target == uvar => Monotype::EVar(replacement.to_owned()),
+            Monotype::List(monotype) => {
+                Monotype::List(Box::new(monotype.substitute(target, replacement)))
+            }
+            Monotype::Func(arg_types, res_type) => Monotype::Func(
+                arg_types
+                    .iter()
+                    .map(|arg_type| arg_type.substitute(target, replacement))
+                    .collect(),
+                Box::new(res_type.substitute(target, replacement)),
+            ),
+            _ => self.to_owned(),
+        }
+    }
 }
 
 impl PartialEq for Monotype {
@@ -424,10 +465,7 @@ mod test {
 
         let result = infer_lit(lit);
 
-        assert_eq!(
-            result,
-            Ok(Monotype::List(Box::new(Monotype::I64)))
-        )
+        assert_eq!(result, Ok(Monotype::List(Box::new(Monotype::I64))))
     }
 
     #[test]
@@ -436,10 +474,7 @@ mod test {
 
         let result = infer_lit(lit);
 
-        assert_eq!(
-            result,
-            Ok(Monotype::List(Box::new(Monotype::I64)))
-        )
+        assert_eq!(result, Ok(Monotype::List(Box::new(Monotype::I64))))
     }
 
     #[test]

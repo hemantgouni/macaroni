@@ -1,8 +1,6 @@
-#![allow(unused_variables)]
-
 use crate::check::ordered_env::{OrdEnv, OrdEnvElem};
 use crate::check::well_formed::well_formed;
-use crate::check::{EVar, Monotype, Type, TypeError};
+use crate::check::{EVar, Monotype, Type, TypeError, UVar};
 
 use crate::utils::get_unique_id;
 
@@ -41,7 +39,7 @@ fn instantiate_left(left: EVar, right: Type, env: OrdEnv) -> Result<OrdEnv, Type
         // InstLArr
         // Have to create a ton of existentials here
         Type::Func(arg_types, res_type) => match env.split_on(&OrdEnvElem::EVar(left.clone())) {
-            Some((left_env, elem, right_env)) => {
+            Some((left_env, _, right_env)) => {
                 let arg_pairs: Vec<(&Type, EVar)> = arg_types
                     .iter()
                     .map(|arg_type| (arg_type, EVar(get_unique_id())))
@@ -60,20 +58,22 @@ fn instantiate_left(left: EVar, right: Type, env: OrdEnv) -> Result<OrdEnv, Type
                     ),
                 );
 
-                let env_to_insert = OrdEnv(
-                    arg_pairs
-                        .iter()
-                        .map(|pair| OrdEnvElem::EVar(pair.1.clone()))
-                        .collect(),
-                )
-                .add(func_esol);
-
-                let new_env_initial = left_env.concat(&env_to_insert).concat(&right_env);
+                let new_env_init = left_env
+                    .concat(
+                        &OrdEnv(
+                            arg_pairs
+                                .iter()
+                                .map(|pair| OrdEnvElem::EVar(pair.1.clone()))
+                                .collect(),
+                        )
+                        .add(func_esol),
+                    )
+                    .concat(&right_env);
 
                 arg_pairs
                     .iter()
                     .fold(
-                        Ok(new_env_initial),
+                        Ok(new_env_init),
                         |env_or_err: Result<OrdEnv, TypeError>, pair| {
                             let in_env = env_or_err?;
                             instantiate_right(
@@ -98,7 +98,7 @@ fn instantiate_left(left: EVar, right: Type, env: OrdEnv) -> Result<OrdEnv, Type
             if env.contains(&OrdEnvElem::EVar(left.clone())) {
                 instantiate_left(left.clone(), *typ, env.add(OrdEnvElem::UVar(uvar.clone()))).map(
                     |out_env| match out_env.split_on(&OrdEnvElem::UVar(uvar)) {
-                        Some((left_env, elem, right_env)) => left_env,
+                        Some((left_env, _, _)) => left_env,
                         None => panic!("The variable we inserted wasn't found. This is a bug!."),
                     },
                 )
@@ -109,9 +109,87 @@ fn instantiate_left(left: EVar, right: Type, env: OrdEnv) -> Result<OrdEnv, Type
     }
 }
 
-fn instantiate_right(right: Type, left: EVar, env: OrdEnv) -> Result<OrdEnv, TypeError> {
-    match right {
-        _ => todo!(),
+fn instantiate_right(left: Type, right: EVar, env: OrdEnv) -> Result<OrdEnv, TypeError> {
+    match left {
+        // InstRSolve, InstRReach
+        Type::Monotype(_) => instantiate_left(right, left, env),
+        // InstRArr
+        Type::Func(arg_types, res_type) => match env.split_on(&OrdEnvElem::EVar(right.clone())) {
+            Some((left_env, _, right_env)) => {
+                let arg_pairs: Vec<(&Type, EVar)> = arg_types
+                    .iter()
+                    .map(|arg_type| (arg_type, EVar(get_unique_id())))
+                    .collect();
+
+                let res_pair: (&Type, EVar) = (&*res_type, EVar(get_unique_id()));
+
+                let func_esol = OrdEnvElem::ESol(
+                    right,
+                    Monotype::Func(
+                        arg_pairs
+                            .iter()
+                            .map(|pair| Monotype::EVar(pair.1.clone()))
+                            .collect(),
+                        Box::new(Monotype::EVar(res_pair.1.to_owned())),
+                    ),
+                );
+
+                let new_env_init = left_env
+                    .concat(
+                        &OrdEnv(
+                            arg_pairs
+                                .iter()
+                                .map(|pair| OrdEnvElem::EVar(pair.1.clone()))
+                                .collect(),
+                        )
+                        .add(func_esol),
+                    )
+                    .concat(&right_env);
+
+                arg_pairs
+                    .iter()
+                    .fold(
+                        Ok(new_env_init),
+                        |env_or_err: Result<OrdEnv, TypeError>, pair| {
+                            let in_env = env_or_err?;
+                            instantiate_left(
+                                pair.1.to_owned(),
+                                in_env.substitute(pair.0.to_owned()),
+                                in_env,
+                            )
+                        },
+                    )
+                    .and_then(|in_env| {
+                        instantiate_right(
+                            in_env.substitute(res_pair.0.to_owned()),
+                            res_pair.1,
+                            in_env,
+                        )
+                    })
+            }
+            None => Err(TypeError::OrdEnvElemNotFound(OrdEnvElem::EVar(right))),
+        },
+        // InstRAllL
+        Type::Forall(UVar(name), typ) => {
+            if env.contains(&OrdEnvElem::EVar(right.clone())) {
+                let new_env_init = env
+                    .add(OrdEnvElem::Marker(EVar(name.clone())))
+                    .add(OrdEnvElem::EVar(EVar(name.clone())));
+
+                instantiate_right(
+                    typ.substitute(&UVar(name.clone()), &EVar(name.clone())),
+                    right,
+                    new_env_init,
+                )?
+                .split_on(&OrdEnvElem::Marker(EVar(name.clone())))
+                .map(|split| split.0)
+                .ok_or(TypeError::OrdEnvElemNotFound(OrdEnvElem::Marker(EVar(
+                    name,
+                ))))
+            } else {
+                Err(TypeError::OrdEnvElemNotFound(OrdEnvElem::EVar(right)))
+            }
+        }
     }
 }
 
