@@ -302,6 +302,7 @@ mod test {
         assert_eq!(result, Ok(input_env))
     }
 
+    // instantiation example from figure 12
     #[test]
     fn test_InstRAllL_2() {
         let input_env = OrdEnv(vec![OrdEnvElem::EVar(EVar("alpha".to_string()))]);

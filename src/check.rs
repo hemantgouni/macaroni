@@ -1,8 +1,9 @@
 #![allow(dead_code)]
 
-mod instantiate;
 mod ordered_env;
 mod well_formed;
+mod instantiate;
+mod subtyping;
 
 use crate::check::ordered_env::OrdEnvElem;
 use crate::data::{Env, Ident, Lit, Toplevel, AST};
@@ -14,6 +15,9 @@ pub struct UVar(pub String);
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct EVar(pub String);
 
+// Remember, higher rank polymorphism is impredicativity ONLY for function constructors, which is
+// why Func is specially a Type here (can contain foralls). A predicative (or prenex) system
+// wouldn't have Func here, either
 #[derive(Debug, Eq, Clone)]
 pub enum Type {
     Forall(UVar, Box<Type>),
