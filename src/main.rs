@@ -3,6 +3,7 @@ mod check;
 mod data;
 mod evaluate;
 mod expand;
+mod fold;
 mod parse;
 mod utils;
 
