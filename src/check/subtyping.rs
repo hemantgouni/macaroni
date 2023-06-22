@@ -5,7 +5,7 @@ use crate::check::{EVar, Expected, Given, Monotype, Type, TypeError, UVar};
 // see 'figure 9: algorithmic subtyping' for rules
 
 fn subtype(left: Type, right: Type, env: OrdEnv) -> Result<OrdEnv, TypeError> {
-    match (left.clone(), right.clone()) {
+    match (left, right) {
         // <: Var
         (Type::Monotype(Monotype::UVar(uvar1)), Type::Monotype(Monotype::UVar(uvar2)))
             if uvar1 == uvar2 =>
@@ -63,11 +63,6 @@ fn subtype(left: Type, right: Type, env: OrdEnv) -> Result<OrdEnv, TypeError> {
         }
         // <: forallR
         (type_left, Type::Forall(uvar, type_quantified)) => {
-            dbg!("At ForallR");
-            dbg!(left.clone());
-            dbg!(right.clone());
-            dbg!(env.clone());
-
             let env_new = env.add(OrdEnvElem::UVar(uvar.clone()));
 
             subtype(type_left, *type_quantified, env_new)?
@@ -94,11 +89,6 @@ fn subtype(left: Type, right: Type, env: OrdEnv) -> Result<OrdEnv, TypeError> {
         }
         // <: InstantiateL
         (Type::Monotype(Monotype::EVar(evar)), type_right) => {
-            dbg!("At InstantiateL");
-            dbg!(left);
-            dbg!(right);
-            dbg!(env.clone());
-
             if env.contains(&OrdEnvElem::EVar(evar.clone())) {
                 if type_right.free_evars().contains(&evar) {
                     Err(TypeError::Occurs(evar, type_right))
@@ -201,6 +191,23 @@ mod test {
     }
 
     #[test]
+    fn subtype_poly_2() {
+        let type_left = Type::Forall(
+            UVar("a".to_string()),
+            Box::new(Type::Monotype(Monotype::UVar(UVar("a".to_string())))),
+        );
+
+        let type_right = Type::Forall(
+            UVar("b".to_string()),
+            Box::new(Type::Monotype(Monotype::UVar(UVar("b".to_string())))),
+        );
+
+        let res = subtype(type_left, type_right, OrdEnv::new());
+
+        assert_eq!(res, Ok(OrdEnv::new()))
+    }
+
+    #[test]
     fn subtype_poly_func_1() {
         let type_left = Type::Forall(
             UVar("b".to_string()),
@@ -244,23 +251,6 @@ mod test {
                 Given(Type::Monotype(Monotype::Bool))
             ))
         )
-    }
-
-    #[test]
-    fn subtype_poly_2() {
-        let type_left = Type::Forall(
-            UVar("a".to_string()),
-            Box::new(Type::Monotype(Monotype::UVar(UVar("a".to_string())))),
-        );
-
-        let type_right = Type::Forall(
-            UVar("b".to_string()),
-            Box::new(Type::Monotype(Monotype::UVar(UVar("b".to_string())))),
-        );
-
-        let res = subtype(type_left, type_right, OrdEnv::new());
-
-        assert_eq!(res, Ok(OrdEnv::new()))
     }
 
     #[test]
