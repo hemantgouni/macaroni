@@ -88,6 +88,14 @@ fn subtype(left: Type, right: Type, env: OrdEnv) -> Result<OrdEnv, TypeError> {
                 .map(|(before_env, _, _)| before_env)
                 .ok_or(TypeError::UVarNotFound(uvar))
         }
+        // <: InstantiateL
+        (Type::Monotype(Monotype::EVar(evar)), type_right) => {
+            if env.contains(&OrdEnvElem::EVar(evar.clone())) {
+                todo!()
+            } else {
+                Err(TypeError::EVarNotFound(evar))
+            }
+        }
         _ => todo!(),
     }
 }

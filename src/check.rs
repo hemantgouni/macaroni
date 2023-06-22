@@ -1,9 +1,9 @@
 #![allow(dead_code)]
 
-mod ordered_env;
-mod well_formed;
 mod instantiate;
+mod ordered_env;
 mod subtyping;
+mod well_formed;
 
 use crate::check::ordered_env::OrdEnvElem;
 use crate::data::{Env, Ident, Lit, Toplevel, AST};
@@ -70,6 +70,23 @@ impl Type {
                 Box::new(res_type.substitute(target, replacement)),
             ),
             Type::Monotype(monotype) => Type::Monotype(monotype.substitute(target, replacement)),
+        }
+    }
+
+    pub fn free_evars(&self) -> Vec<EVar> {
+        match self {
+            Type::Forall(UVar(uvar_str), type_quantified) => type_quantified
+                .free_evars()
+                .iter()
+                .filter(|EVar(evar_str)| uvar_str != evar_str)
+                .map(|evar| evar.to_owned())
+                .collect(),
+            Type::Func(arg_types, res_type) => arg_types
+                .iter()
+                .flat_map(|arg_type| arg_type.free_evars().to_owned())
+                .collect::<Vec<EVar>>()
+                .append_immutable(&res_type.free_evars()),
+            _ => todo!(),
         }
     }
 }
