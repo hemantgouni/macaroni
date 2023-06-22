@@ -3,20 +3,12 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 pub trait VecUtils {
     type Elem;
 
-    fn all_eq(&self) -> bool;
     fn append_immutable(&self, other: &Self) -> Self;
     fn push_immutable(&self, other: &Self::Elem) -> Self;
 }
 
 impl<A: PartialEq + Clone> VecUtils for Vec<A> {
     type Elem = A;
-
-    fn all_eq(&self) -> bool {
-        match self.as_slice() {
-            [] => true,
-            [head, rest @ ..] => rest.iter().all(|elem| elem == head),
-        }
-    }
 
     fn append_immutable(&self, other: &Self) -> Self {
         let mut self_clone = self.clone();

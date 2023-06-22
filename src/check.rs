@@ -86,7 +86,7 @@ impl Type {
                 .flat_map(|arg_type| arg_type.free_evars().to_owned())
                 .collect::<Vec<EVar>>()
                 .append_immutable(&res_type.free_evars()),
-            _ => todo!(),
+            Type::Monotype(monotype) => monotype.free_evars(),
         }
     }
 }
@@ -119,6 +119,24 @@ impl Monotype {
                 Box::new(res_type.substitute(target, replacement)),
             ),
             _ => self.to_owned(),
+        }
+    }
+
+    fn free_evars(&self) -> Vec<EVar> {
+        match self {
+            Monotype::EVar(evar) => vec![evar.to_owned()],
+            Monotype::List(monotype) => monotype.free_evars(),
+            Monotype::Func(arg_monotypes, res_monotype) => arg_monotypes
+                .iter()
+                .flat_map(|arg_monotype| arg_monotype.free_evars().to_owned())
+                .collect::<Vec<EVar>>()
+                .append_immutable(&res_monotype.free_evars()),
+            Monotype::Bottom
+            | Monotype::UVar(..)
+            | Monotype::I64
+            | Monotype::Bool
+            | Monotype::String
+            | Monotype::Symbol => Vec::new(),
         }
     }
 }
