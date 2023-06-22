@@ -1,3 +1,4 @@
+use crate::check::instantiate::{instantiate_left, instantiate_right};
 use crate::check::ordered_env::{OrdEnv, OrdEnvElem};
 use crate::check::{EVar, Monotype, Type, TypeError, UVar};
 
@@ -91,11 +92,30 @@ fn subtype(left: Type, right: Type, env: OrdEnv) -> Result<OrdEnv, TypeError> {
         // <: InstantiateL
         (Type::Monotype(Monotype::EVar(evar)), type_right) => {
             if env.contains(&OrdEnvElem::EVar(evar.clone())) {
-                todo!()
+                if type_right.free_evars().contains(&evar) {
+                    instantiate_left(evar, type_right, env)
+                } else {
+                    Err(TypeError::Occurs(evar, type_right))
+                }
             } else {
                 Err(TypeError::EVarNotFound(evar))
             }
         }
-        _ => todo!(),
+        // <: InstantiateR
+        (type_left, Type::Monotype(Monotype::EVar(evar))) => {
+            if env.contains(&OrdEnvElem::EVar(evar.clone())) {
+                if type_left.free_evars().contains(&evar) {
+                    instantiate_right(type_left, evar, env)
+                } else {
+                    Err(TypeError::Occurs(evar, type_left))
+                }
+            } else {
+                Err(TypeError::EVarNotFound(evar))
+            }
+        }
+        (type_left, type_right) => Err(TypeError::Message(format!(
+            "Subtyping attempted on invalid arguments: {:#?}, {:#?}",
+            type_left, type_right
+        ))),
     }
 }

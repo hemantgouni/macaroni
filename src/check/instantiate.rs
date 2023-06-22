@@ -4,7 +4,7 @@ use crate::check::{EVar, Monotype, Type, TypeError, UVar};
 
 use crate::utils::get_unique_id;
 
-fn instantiate_left(left: EVar, right: Type, env: OrdEnv) -> Result<OrdEnv, TypeError> {
+pub fn instantiate_left(left: EVar, right: Type, env: OrdEnv) -> Result<OrdEnv, TypeError> {
     match right {
         // InstLSolve
         Type::Monotype(typ) => match env.split_on(&OrdEnvElem::EVar(left.clone())) {
@@ -110,7 +110,7 @@ fn instantiate_left(left: EVar, right: Type, env: OrdEnv) -> Result<OrdEnv, Type
     }
 }
 
-fn instantiate_right(left: Type, right: EVar, env: OrdEnv) -> Result<OrdEnv, TypeError> {
+pub fn instantiate_right(left: Type, right: EVar, env: OrdEnv) -> Result<OrdEnv, TypeError> {
     match left {
         // InstRSolve, InstRReach
         Type::Monotype(_) => instantiate_left(right, left, env),

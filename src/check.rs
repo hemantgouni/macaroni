@@ -178,6 +178,7 @@ pub enum TypeError {
     EVarNotFound(EVar),
     OrdEnvElemNotFound(OrdEnvElem),
     ImpredicativeForall(Type),
+    Occurs(EVar, Type),
     Message(String),
 }
 
