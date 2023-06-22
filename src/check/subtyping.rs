@@ -1,11 +1,11 @@
 use crate::check::instantiate::{instantiate_left, instantiate_right};
 use crate::check::ordered_env::{OrdEnv, OrdEnvElem};
-use crate::check::{EVar, Monotype, Type, TypeError, UVar};
+use crate::check::{EVar, Expected, Given, Monotype, Type, TypeError, UVar};
 
 // see 'figure 9: algorithmic subtyping' for rules
 
 fn subtype(left: Type, right: Type, env: OrdEnv) -> Result<OrdEnv, TypeError> {
-    match (left, right) {
+    match (left.clone(), right.clone()) {
         // <: Var
         (Type::Monotype(Monotype::UVar(uvar1)), Type::Monotype(Monotype::UVar(uvar2)))
             if uvar1 == uvar2 =>
@@ -17,10 +17,10 @@ fn subtype(left: Type, right: Type, env: OrdEnv) -> Result<OrdEnv, TypeError> {
             }
         }
         (Type::Monotype(Monotype::UVar(uvar1)), Type::Monotype(Monotype::UVar(uvar2))) => {
-            Err(TypeError::Message(format!(
-                "Subtyping attempted on uvars that are not comparable: {:?}, {:?}",
-                uvar1, uvar2
-            )))
+            Err(TypeError::SubtypeMismatch(
+                Expected(Type::Monotype(Monotype::UVar(uvar1))),
+                Given(Type::Monotype(Monotype::UVar(uvar2))),
+            ))
         }
         // <: Exvar
         (Type::Monotype(Monotype::EVar(evar1)), Type::Monotype(Monotype::EVar(evar2)))
@@ -33,13 +33,11 @@ fn subtype(left: Type, right: Type, env: OrdEnv) -> Result<OrdEnv, TypeError> {
             }
         }
         (Type::Monotype(Monotype::EVar(evar1)), Type::Monotype(Monotype::EVar(evar2))) => {
-            Err(TypeError::Message(format!(
-                "Subtyping attempted on evars that are not comparable: {:?}, {:?}",
-                evar1, evar2
-            )))
+            Err(TypeError::SubtypeMismatch(
+                Expected(Type::Monotype(Monotype::EVar(evar1))),
+                Given(Type::Monotype(Monotype::EVar(evar2))),
+            ))
         }
-        // <: Unit
-        (Type::Monotype(monotype1), Type::Monotype(monotype2)) if monotype1 == monotype2 => Ok(env),
         // <: ->
         (Type::Func(args1, res1), Type::Func(args2, res2)) => {
             let arg_out_env: OrdEnv =
@@ -63,6 +61,20 @@ fn subtype(left: Type, right: Type, env: OrdEnv) -> Result<OrdEnv, TypeError> {
 
             Ok(res_out_env)
         }
+        // <: forallR
+        (type_left, Type::Forall(uvar, type_quantified)) => {
+            dbg!("At ForallR");
+            dbg!(left.clone());
+            dbg!(right.clone());
+            dbg!(env.clone());
+
+            let env_new = env.add(OrdEnvElem::UVar(uvar.clone()));
+
+            subtype(type_left, *type_quantified, env_new)?
+                .split_on(&OrdEnvElem::UVar(uvar.clone()))
+                .map(|(before_env, _, _)| before_env)
+                .ok_or(TypeError::UVarNotFound(uvar))
+        }
         // <: forallL
         (Type::Forall(UVar(str), type_quantified), type_right) => {
             let env = env
@@ -80,22 +92,18 @@ fn subtype(left: Type, right: Type, env: OrdEnv) -> Result<OrdEnv, TypeError> {
                     OrdEnvElem::Marker(EVar(str))
                 )))
         }
-        // <: forallR
-        (type_left, Type::Forall(uvar, type_quantified)) => {
-            let env_new = env.add(OrdEnvElem::UVar(uvar.clone()));
-
-            subtype(type_left, *type_quantified, env_new)?
-                .split_on(&OrdEnvElem::UVar(uvar.clone()))
-                .map(|(before_env, _, _)| before_env)
-                .ok_or(TypeError::UVarNotFound(uvar))
-        }
         // <: InstantiateL
         (Type::Monotype(Monotype::EVar(evar)), type_right) => {
+            dbg!("At InstantiateL");
+            dbg!(left);
+            dbg!(right);
+            dbg!(env.clone());
+
             if env.contains(&OrdEnvElem::EVar(evar.clone())) {
                 if type_right.free_evars().contains(&evar) {
-                    instantiate_left(evar, type_right, env)
-                } else {
                     Err(TypeError::Occurs(evar, type_right))
+                } else {
+                    instantiate_left(evar, type_right, env)
                 }
             } else {
                 Err(TypeError::EVarNotFound(evar))
@@ -104,18 +112,177 @@ fn subtype(left: Type, right: Type, env: OrdEnv) -> Result<OrdEnv, TypeError> {
         // <: InstantiateR
         (type_left, Type::Monotype(Monotype::EVar(evar))) => {
             if env.contains(&OrdEnvElem::EVar(evar.clone())) {
+                // occurs check
                 if type_left.free_evars().contains(&evar) {
-                    instantiate_right(type_left, evar, env)
-                } else {
                     Err(TypeError::Occurs(evar, type_left))
+                } else {
+                    instantiate_right(type_left, evar, env)
                 }
             } else {
                 Err(TypeError::EVarNotFound(evar))
             }
         }
+        // <: Unit
+        (Type::Monotype(monotype1), Type::Monotype(monotype2)) if monotype1 == monotype2 => Ok(env),
+        (Type::Monotype(monotype1), Type::Monotype(monotype2)) => Err(TypeError::SubtypeMismatch(
+            Expected(Type::Monotype(monotype1)),
+            Given(Type::Monotype(monotype2)),
+        )),
         (type_left, type_right) => Err(TypeError::Message(format!(
-            "Subtyping attempted on invalid arguments: {:#?}, {:#?}",
+            "Subtyping attempted on invalid arguments: {:?}, {:?}",
             type_left, type_right
         ))),
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn subtype_basic_1() {
+        let type_left = Type::Monotype(Monotype::I64);
+        let type_right = Type::Monotype(Monotype::I64);
+
+        let res = subtype(type_left, type_right, OrdEnv::new());
+
+        assert_eq!(res, Ok(OrdEnv::new()))
+    }
+
+    #[test]
+    fn subtype_basic_2() {
+        let type_left = Type::Monotype(Monotype::Bool);
+        let type_right = Type::Monotype(Monotype::I64);
+
+        let res = subtype(type_left.clone(), type_right.clone(), OrdEnv::new());
+
+        assert_eq!(
+            res,
+            Err(TypeError::SubtypeMismatch(
+                Expected(Type::Monotype(Monotype::Bool)),
+                Given(Type::Monotype(Monotype::I64))
+            ))
+        )
+    }
+
+    #[test]
+    fn subtype_bottom_1() {
+        let type_left = Type::Monotype(Monotype::Bottom);
+        let type_right = Type::Monotype(Monotype::Bottom);
+
+        let res = subtype(type_left, type_right, OrdEnv::new());
+
+        assert_eq!(res, Ok(OrdEnv::new()))
+    }
+
+    // bottom is automatically handled correctly by subtyping via the equality defined on types
+    #[test]
+    fn subtype_bottom_2() {
+        let type_left = Type::Monotype(Monotype::Bottom);
+        let type_right = Type::Monotype(Monotype::I64);
+
+        let res = subtype(type_left, type_right, OrdEnv::new());
+
+        assert_eq!(res, Ok(OrdEnv::new()))
+    }
+
+    #[test]
+    fn subtype_poly_1() {
+        let type_left = Type::Forall(
+            UVar("a".to_string()),
+            Box::new(Type::Monotype(Monotype::UVar(UVar("a".to_string())))),
+        );
+
+        let type_right = Type::Monotype(Monotype::I64);
+
+        let res = subtype(type_left, type_right, OrdEnv::new());
+
+        assert_eq!(res, Ok(OrdEnv::new()))
+    }
+
+    #[test]
+    fn subtype_poly_func_1() {
+        let type_left = Type::Forall(
+            UVar("b".to_string()),
+            Box::new(Type::Func(
+                vec![Type::Monotype(Monotype::UVar(UVar("b".to_string())))],
+                Box::new(Type::Monotype(Monotype::UVar(UVar("b".to_string())))),
+            )),
+        );
+
+        let type_right = Type::Func(
+            vec![Type::Monotype(Monotype::I64)],
+            Box::new(Type::Monotype(Monotype::I64)),
+        );
+
+        let res = subtype(type_left, type_right, OrdEnv::new());
+
+        assert_eq!(res, Ok(OrdEnv::new()))
+    }
+
+    #[test]
+    fn subtype_poly_func_2() {
+        let type_left = Type::Forall(
+            UVar("b".to_string()),
+            Box::new(Type::Func(
+                vec![Type::Monotype(Monotype::UVar(UVar("b".to_string())))],
+                Box::new(Type::Monotype(Monotype::UVar(UVar("b".to_string())))),
+            )),
+        );
+
+        let type_right = Type::Func(
+            vec![Type::Monotype(Monotype::I64)],
+            Box::new(Type::Monotype(Monotype::Bool)),
+        );
+
+        let res = subtype(type_left, type_right, OrdEnv::new());
+
+        assert_eq!(
+            res,
+            Err(TypeError::SubtypeMismatch(
+                Expected(Type::Monotype(Monotype::I64)),
+                Given(Type::Monotype(Monotype::Bool))
+            ))
+        )
+    }
+
+    #[test]
+    fn subtype_poly_2() {
+        let type_left = Type::Forall(
+            UVar("a".to_string()),
+            Box::new(Type::Monotype(Monotype::UVar(UVar("a".to_string())))),
+        );
+
+        let type_right = Type::Forall(
+            UVar("b".to_string()),
+            Box::new(Type::Monotype(Monotype::UVar(UVar("b".to_string())))),
+        );
+
+        let res = subtype(type_left, type_right, OrdEnv::new());
+
+        assert_eq!(res, Ok(OrdEnv::new()))
+    }
+
+    #[test]
+    fn subtype_poly_func_3() {
+        let type_left = Type::Forall(
+            UVar("a".to_string()),
+            Box::new(Type::Func(
+                vec![Type::Monotype(Monotype::UVar(UVar("a".to_string())))],
+                Box::new(Type::Monotype(Monotype::UVar(UVar("a".to_string())))),
+            )),
+        );
+
+        let type_right = Type::Forall(
+            UVar("b".to_string()),
+            Box::new(Type::Func(
+                vec![Type::Monotype(Monotype::UVar(UVar("b".to_string())))],
+                Box::new(Type::Monotype(Monotype::UVar(UVar("b".to_string())))),
+            )),
+        );
+
+        let res = subtype(type_left, type_right, OrdEnv::new());
+
+        assert_eq!(res, Ok(OrdEnv::new()))
     }
 }

@@ -173,6 +173,7 @@ pub struct Given(Type);
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum TypeError {
     Mismatch(Expected, Given),
+    SubtypeMismatch(Expected, Given),
     TVarNotFound(Ident),
     UVarNotFound(UVar),
     EVarNotFound(EVar),
