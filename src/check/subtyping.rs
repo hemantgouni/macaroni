@@ -191,6 +191,26 @@ mod test {
     }
 
     #[test]
+    fn subtype_poly_1_err() {
+        let type_left = Type::Monotype(Monotype::I64);
+
+        let type_right = Type::Forall(
+            UVar("a".to_string()),
+            Box::new(Type::Monotype(Monotype::UVar(UVar("a".to_string())))),
+        );
+
+        let res = subtype(type_left, type_right, OrdEnv::new());
+
+        assert_eq!(
+            res,
+            Err(TypeError::SubtypeMismatch(
+                Expected(Type::Monotype(Monotype::I64)),
+                Given(Type::Monotype(Monotype::UVar(UVar("a".to_string()))))
+            ))
+        )
+    }
+
+    #[test]
     fn subtype_poly_2() {
         let type_left = Type::Forall(
             UVar("a".to_string()),
@@ -228,7 +248,7 @@ mod test {
     }
 
     #[test]
-    fn subtype_poly_func_2() {
+    fn subtype_poly_func_1_err() {
         let type_left = Type::Forall(
             UVar("b".to_string()),
             Box::new(Type::Func(
@@ -254,7 +274,7 @@ mod test {
     }
 
     #[test]
-    fn subtype_poly_func_3() {
+    fn subtype_poly_func_2() {
         let type_left = Type::Forall(
             UVar("a".to_string()),
             Box::new(Type::Func(
@@ -269,6 +289,71 @@ mod test {
                 vec![Type::Monotype(Monotype::UVar(UVar("b".to_string())))],
                 Box::new(Type::Monotype(Monotype::UVar(UVar("b".to_string())))),
             )),
+        );
+
+        let res = subtype(type_left, type_right, OrdEnv::new());
+
+        assert_eq!(res, Ok(OrdEnv::new()))
+    }
+
+    #[test]
+    fn subtype_poly_func_3() {
+        let type_left = Type::Forall(
+            UVar("a".to_string()),
+            Box::new(Type::Forall(
+                UVar("b".to_string()),
+                Box::new(Type::Func(
+                    vec![Type::Monotype(Monotype::UVar(UVar("b".to_string())))],
+                    Box::new(Type::Monotype(Monotype::UVar(UVar("a".to_string())))),
+                )),
+            )),
+        );
+
+        let type_right = Type::Func(
+            vec![Type::Monotype(Monotype::I64)],
+            Box::new(Type::Monotype(Monotype::Bool)),
+        );
+
+        let res = subtype(type_left, type_right, OrdEnv::new());
+
+        assert_eq!(res, Ok(OrdEnv::new()))
+    }
+
+    #[test]
+    fn subtype_poly_func_4() {
+        let type_left = Type::Forall(
+            UVar("a".to_string()),
+            Box::new(Type::Monotype(Monotype::UVar(UVar("a".to_string())))),
+        );
+
+        let type_right = Type::Forall(
+            UVar("b".to_string()),
+            Box::new(Type::Func(
+                vec![Type::Monotype(Monotype::UVar(UVar("b".to_string())))],
+                Box::new(Type::Monotype(Monotype::UVar(UVar("b".to_string())))),
+            )),
+        );
+
+        let res = subtype(type_left, type_right, OrdEnv::new());
+
+        assert_eq!(res, Ok(OrdEnv::new()))
+    }
+
+    // TODO: better error message here?
+    #[test]
+    #[should_panic]
+    fn subtype_poly_func_4_err() {
+        let type_left = Type::Forall(
+            UVar("b".to_string()),
+            Box::new(Type::Func(
+                vec![Type::Monotype(Monotype::UVar(UVar("b".to_string())))],
+                Box::new(Type::Monotype(Monotype::UVar(UVar("b".to_string())))),
+            )),
+        );
+
+        let type_right = Type::Forall(
+            UVar("a".to_string()),
+            Box::new(Type::Monotype(Monotype::UVar(UVar("a".to_string())))),
         );
 
         let res = subtype(type_left, type_right, OrdEnv::new());
