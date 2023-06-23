@@ -341,7 +341,6 @@ mod test {
 
     // TODO: better error message here?
     #[test]
-    #[should_panic]
     fn subtype_poly_func_4_err() {
         let type_left = Type::Forall(
             UVar("b".to_string()),
@@ -358,6 +357,6 @@ mod test {
 
         let res = subtype(type_left, type_right, OrdEnv::new());
 
-        assert_eq!(res, Ok(OrdEnv::new()))
+        assert!(matches!(res, Err(_)))
     }
 }
