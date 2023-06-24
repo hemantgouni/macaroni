@@ -2,7 +2,7 @@ use crate::check::ordered_env::{OrdEnv, OrdEnvElem};
 use crate::check::well_formed::well_formed;
 use crate::check::{EVar, Monotype, Type, TypeError, UVar};
 
-use crate::utils::get_unique_id;
+use crate::utils::{get_unique_id, UniqueString};
 
 pub fn instantiate_left(left: EVar, right: Type, env: OrdEnv) -> Result<OrdEnv, TypeError> {
     dbg!("Instantiate left:");
@@ -101,12 +101,17 @@ pub fn instantiate_left(left: EVar, right: Type, env: OrdEnv) -> Result<OrdEnv, 
         // InstLAllR
         Type::Forall(uvar, typ) => {
             if env.contains(&OrdEnvElem::EVar(left.clone())) {
-                instantiate_left(left.clone(), *typ, env.add(OrdEnvElem::UVar(uvar.clone()))).map(
-                    |out_env| match out_env.split_on(&OrdEnvElem::UVar(uvar)) {
-                        Some((left_env, _, _)) => left_env,
-                        None => panic!("The variable we inserted wasn't found. This is a bug!."),
-                    },
-                )
+                let unique_marker = OrdEnvElem::UniqueMarker(UniqueString::new());
+
+                instantiate_left(
+                    left.clone(),
+                    *typ,
+                    env.add(unique_marker.clone())
+                        .add(OrdEnvElem::UVar(uvar.clone())),
+                )?
+                .split_on(&unique_marker)
+                .map(|tuple| tuple.0)
+                .ok_or(TypeError::OrdEnvElemNotFound(unique_marker))
             } else {
                 Err(TypeError::OrdEnvElemNotFound(OrdEnvElem::EVar(left)))
             }
@@ -180,8 +185,10 @@ pub fn instantiate_right(left: Type, right: EVar, env: OrdEnv) -> Result<OrdEnv,
         // InstRAllL
         Type::Forall(UVar(name), typ) => {
             if env.contains(&OrdEnvElem::EVar(right.clone())) {
+                let unique_marker = OrdEnvElem::UniqueMarker(UniqueString::new());
+
                 let new_env_init = env
-                    .add(OrdEnvElem::Marker(EVar(name.clone())))
+                    .add(unique_marker.clone())
                     .add(OrdEnvElem::EVar(EVar(name.clone())));
 
                 dbg!(new_env_init.clone());
@@ -191,11 +198,9 @@ pub fn instantiate_right(left: Type, right: EVar, env: OrdEnv) -> Result<OrdEnv,
                     dbg!(right),
                     new_env_init,
                 )?
-                .split_on(&OrdEnvElem::Marker(EVar(name.clone())))
+                .split_on(&unique_marker)
                 .map(|split| split.0)
-                .ok_or(TypeError::OrdEnvElemNotFound(OrdEnvElem::Marker(EVar(
-                    name,
-                ))))
+                .ok_or(TypeError::OrdEnvElemNotFound(unique_marker))
             } else {
                 Err(TypeError::OrdEnvElemNotFound(OrdEnvElem::EVar(right)))
             }

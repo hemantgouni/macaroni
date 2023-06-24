@@ -3,8 +3,9 @@
 use crate::check::ordered_env::{OrdEnv, OrdEnvElem};
 use crate::check::subtyping::subtype;
 use crate::check::well_formed::well_formed;
-use crate::check::{Expected, Given, Lit, Monotype, Type, TypeError};
+use crate::check::{EVar, Expected, Given, Lit, Monotype, Type, TypeError, UVar};
 use crate::data::AST;
+use crate::utils::UniqueString;
 
 struct InferOut {
     typ: Type,
@@ -58,12 +59,34 @@ fn check_expr(expr: AST, typ: Type, env: OrdEnv) -> Result<OrdEnv, TypeError> {
     match (expr.clone(), typ.clone()) {
         // ForallI
         (_, Type::Forall(uvar, typ)) => {
-            let env_appended = env.add(OrdEnvElem::UVar(uvar.clone()));
+            let unique_env_elem = OrdEnvElem::UniqueMarker(UniqueString::new());
+
+            let env_appended = env
+                .add(unique_env_elem.clone())
+                .add(OrdEnvElem::UVar(uvar.clone()));
 
             check_expr(expr, *typ, env_appended.clone())?
-                .split_on(&OrdEnvElem::UVar(uvar.clone()))
+                .split_on(&unique_env_elem)
                 .map(|tuple| tuple.0)
                 .ok_or(TypeError::UVarNotFound(uvar))
+        }
+        (AST::Lambda(ast_args, ast_body), Type::Func(arg_types, res_type))
+            if ast_args.len() == arg_types.len() =>
+        {
+            // TODO: kind of a hack, rework this a bit when we have an a-normal pass
+            let unique_env_elem = OrdEnvElem::UniqueMarker(UniqueString::new());
+
+            let new_env = ast_args.iter().zip(arg_types.iter()).fold(
+                env.add(unique_env_elem.clone()).clone(),
+                |env_accum, (arg_ast, arg_type)| {
+                    env_accum.add(OrdEnvElem::TVar(arg_ast.to_owned(), arg_type.to_owned()))
+                },
+            );
+
+            check_expr(*ast_body, *res_type, new_env)?
+                .split_on(&unique_env_elem)
+                .map(|tuple| tuple.0)
+                .ok_or(TypeError::OrdEnvElemNotFound(unique_env_elem))
         }
         // Sub
         (_, _) => {
@@ -78,5 +101,19 @@ fn check_expr(expr: AST, typ: Type, env: OrdEnv) -> Result<OrdEnv, TypeError> {
                 out_env,
             )
         }
+    }
+}
+
+fn apply_expr(func_type: Type, arg: AST, env: OrdEnv) -> Result<InferOut, TypeError> {
+    match func_type {
+        // ForallApp
+        Type::Forall(UVar(str), quantified_type) => {
+            let substituted_type =
+                quantified_type.substitute(&UVar(str.to_string()), &EVar(str.to_string()));
+            let new_env = env.add(OrdEnvElem::EVar(EVar(str.to_string())));
+
+            apply_expr(substituted_type, arg, new_env)
+        }
+        _ => todo!(),
     }
 }

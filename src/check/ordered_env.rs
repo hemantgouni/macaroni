@@ -1,5 +1,6 @@
 use crate::check::{EVar, Monotype, Type, UVar};
 use crate::data::Ident;
+use crate::utils::UniqueString;
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum OrdEnvElem {
@@ -8,6 +9,7 @@ pub enum OrdEnvElem {
     EVar(EVar),
     ESol(EVar, Monotype),
     Marker(EVar),
+    UniqueMarker(UniqueString),
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]

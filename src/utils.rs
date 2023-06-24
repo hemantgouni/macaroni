@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 use std::sync::atomic::{AtomicUsize, Ordering};
 
 pub trait VecUtils {
@@ -33,4 +35,13 @@ pub fn get_unique_id() -> String {
     num_string.insert(0, '#');
 
     num_string
+}
+
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub struct UniqueString(String);
+
+impl UniqueString {
+    pub fn new() -> UniqueString {
+        UniqueString(get_unique_id())
+    }
 }

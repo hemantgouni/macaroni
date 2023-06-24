@@ -1,6 +1,7 @@
 use crate::check::instantiate::{instantiate_left, instantiate_right};
 use crate::check::ordered_env::{OrdEnv, OrdEnvElem};
 use crate::check::{EVar, Expected, Given, Monotype, Type, TypeError, UVar};
+use crate::utils::UniqueString;
 
 // see 'figure 9: algorithmic subtyping' for rules
 
@@ -61,31 +62,34 @@ pub fn subtype(left: Type, right: Type, env: OrdEnv) -> Result<OrdEnv, TypeError
 
             Ok(res_out_env)
         }
-        // <: forallR
+        // <: ForallR
         (type_left, Type::Forall(uvar, type_quantified)) => {
-            let env_new = env.add(OrdEnvElem::UVar(uvar.clone()));
+            let unique_marker = OrdEnvElem::UniqueMarker(UniqueString::new());
+
+            let env_new = env
+                .add(unique_marker.clone())
+                .add(OrdEnvElem::UVar(uvar.clone()));
 
             subtype(type_left, *type_quantified, env_new)?
-                .split_on(&OrdEnvElem::UVar(uvar.clone()))
+                .split_on(&unique_marker)
                 .map(|(before_env, _, _)| before_env)
                 .ok_or(TypeError::UVarNotFound(uvar))
         }
-        // <: forallL
+        // <: ForallL
         (Type::Forall(UVar(str), type_quantified), type_right) => {
+            let unique_marker = OrdEnvElem::UniqueMarker(UniqueString::new());
+
             let env = env
-                .add(OrdEnvElem::Marker(EVar(str.clone())))
+                .add(unique_marker.clone())
                 .add(OrdEnvElem::EVar(EVar(str.clone())));
 
             let type_substituted =
                 type_quantified.substitute(&UVar(str.clone()), &EVar(str.clone()));
 
             subtype(type_substituted, type_right, env)?
-                .split_on(&OrdEnvElem::Marker(EVar(str.clone())))
+                .split_on(&unique_marker)
                 .map(|(before_env, _, _)| before_env)
-                .ok_or(TypeError::Message(format!(
-                    "Unable to find our own marker in the environment: {:?}",
-                    OrdEnvElem::Marker(EVar(str))
-                )))
+                .ok_or(TypeError::OrdEnvElemNotFound(unique_marker))
         }
         // <: InstantiateL
         (Type::Monotype(Monotype::EVar(evar)), type_right) => {
