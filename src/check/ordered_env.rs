@@ -18,6 +18,16 @@ impl OrdEnv {
         OrdEnv(Vec::new())
     }
 
+    pub fn type_for_tvar(&self, tvar: Ident) -> Option<Type> {
+        self.0.iter().fold(None, |prev_res, ord_env_elem| {
+            match (prev_res, ord_env_elem) {
+                (None, OrdEnvElem::TVar(name, typ)) if *name == tvar => Some(typ.to_owned()),
+                (None, _) => None,
+                (Some(typ), _) => Some(typ),
+            }
+        })
+    }
+
     pub fn add(&self, elem: OrdEnvElem) -> Self {
         // Ensuring no duplicate entries
         assert!(!self.contains(&elem));

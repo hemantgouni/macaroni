@@ -4,7 +4,7 @@ use crate::check::{EVar, Expected, Given, Monotype, Type, TypeError, UVar};
 
 // see 'figure 9: algorithmic subtyping' for rules
 
-fn subtype(left: Type, right: Type, env: OrdEnv) -> Result<OrdEnv, TypeError> {
+pub fn subtype(left: Type, right: Type, env: OrdEnv) -> Result<OrdEnv, TypeError> {
     match (left, right) {
         // <: Var
         (Type::Monotype(Monotype::UVar(uvar1)), Type::Monotype(Monotype::UVar(uvar2)))
