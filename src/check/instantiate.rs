@@ -110,7 +110,7 @@ pub fn instantiate_left(left: EVar, right: Type, env: OrdEnv) -> Result<OrdEnv, 
                         .add(OrdEnvElem::UVar(uvar.clone())),
                 )?
                 .split_on(&unique_marker)
-                .map(|tuple| tuple.0)
+                .map(|(before_env, _, _)| before_env)
                 .ok_or(TypeError::OrdEnvElemNotFound(unique_marker))
             } else {
                 Err(TypeError::OrdEnvElemNotFound(OrdEnvElem::EVar(left)))

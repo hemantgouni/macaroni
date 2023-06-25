@@ -116,7 +116,7 @@ fn check_expr(expr: AST, typ: Type, env: OrdEnv) -> Result<OrdEnv, TypeError> {
 
             check_expr(expr, *typ, env_appended.clone())?
                 .split_on(&unique_env_elem)
-                .map(|tuple| tuple.0)
+                .map(|(before_env, _, _)| before_env)
                 .ok_or(TypeError::UVarNotFound(uvar))
         }
         // ->I
@@ -135,7 +135,7 @@ fn check_expr(expr: AST, typ: Type, env: OrdEnv) -> Result<OrdEnv, TypeError> {
 
             check_expr(*ast_body, *res_type, new_env)?
                 .split_on(&unique_env_elem)
-                .map(|tuple| tuple.0)
+                .map(|(before_env, _, _)| before_env)
                 .ok_or(TypeError::OrdEnvElemNotFound(unique_env_elem))
         }
         // Sub
