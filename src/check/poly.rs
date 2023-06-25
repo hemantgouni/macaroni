@@ -100,6 +100,15 @@ fn infer_expr(expr: AST, env: OrdEnv) -> Result<InferOut, TypeError> {
             })
             .ok_or(TypeError::OrdEnvElemNotFound(unique_marker))
         }
+        // ->E
+        AST::App(lambda, args) => {
+            let InferOut {
+                typ: lambda_type,
+                env: lambda_out_env,
+            } = infer_expr(*lambda, env)?;
+
+            apply_type(lambda_out_env.substitute(lambda_type), args, lambda_out_env)
+        }
         _ => todo!(),
     }
 }
@@ -154,7 +163,7 @@ fn check_expr(expr: AST, typ: Type, env: OrdEnv) -> Result<OrdEnv, TypeError> {
     }
 }
 
-fn apply_expr(func_type: Type, arg: AST, env: OrdEnv) -> Result<InferOut, TypeError> {
+fn apply_type(func_type: Type, args: Vec<AST>, env: OrdEnv) -> Result<InferOut, TypeError> {
     match func_type {
         // ForallApp
         Type::Forall(UVar(str), quantified_type) => {
@@ -162,7 +171,7 @@ fn apply_expr(func_type: Type, arg: AST, env: OrdEnv) -> Result<InferOut, TypeEr
                 quantified_type.substitute(&UVar(str.to_string()), &EVar(str.to_string()));
             let new_env = env.add(OrdEnvElem::EVar(EVar(str.to_string())));
 
-            apply_expr(substituted_type, arg, new_env)
+            apply_type(substituted_type, args, new_env)
         }
         _ => todo!(),
     }
