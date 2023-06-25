@@ -16,6 +16,12 @@ pub struct UVar(pub String);
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct EVar(pub String);
 
+impl EVar {
+    pub fn new_unique() -> EVar {
+        EVar(crate::utils::get_unique_id())
+    }
+}
+
 // Remember, higher rank polymorphism is impredicativity ONLY for function constructors, which is
 // why Func is specially a Type here (can contain foralls). A predicative (or prenex) system
 // wouldn't have Func here, either

@@ -39,6 +39,12 @@ impl OrdEnv {
         self_clone
     }
 
+    pub fn add_all(&self, elems: Vec<OrdEnvElem>) -> Self {
+        elems
+            .iter()
+            .fold(self.to_owned(), |accum, elem| accum.add(elem.to_owned()))
+    }
+
     pub fn update(&self, target: &OrdEnvElem, elem: OrdEnvElem) -> Option<Self> {
         assert!(!self.contains(&elem));
 

@@ -3,9 +3,9 @@
 use crate::check::ordered_env::{OrdEnv, OrdEnvElem};
 use crate::check::subtyping::subtype;
 use crate::check::well_formed::well_formed;
-use crate::check::{EVar, Expected, Given, Lit, Monotype, Type, TypeError, UVar};
+use crate::check::{EVar, Expected, Given, Ident, Lit, Monotype, Type, TypeError, UVar};
 use crate::data::AST;
-use crate::utils::UniqueString;
+use crate::utils::{UniqueString, VecUtils};
 
 struct InferOut {
     typ: Type,
@@ -51,6 +51,55 @@ fn infer_expr(expr: AST, env: OrdEnv) -> Result<InferOut, TypeError> {
             typ: Type::Monotype(monotype),
             env,
         }),
+        // ->I=>
+        AST::Lambda(args, body) => {
+            let arg_evars: Vec<(Ident, EVar)> = args
+                .iter()
+                .map(|ident| ident.to_owned())
+                .zip(args.iter().map(|_| EVar::new_unique()))
+                .collect();
+
+            let res_type = EVar::new_unique();
+
+            let unique_marker = OrdEnvElem::UniqueMarker(UniqueString::new());
+
+            let env_pre_tvar = env.add_all(
+                arg_evars
+                    .iter()
+                    .map(|(_, evar)| OrdEnvElem::EVar(evar.to_owned()))
+                    .collect::<Vec<OrdEnvElem>>()
+                    .push_immutable(&OrdEnvElem::EVar(res_type.clone()))
+                    .push_immutable(&unique_marker),
+            );
+
+            let new_env: OrdEnv =
+                arg_evars
+                    .iter()
+                    .fold(env_pre_tvar, |accum_env, (ident, evar)| {
+                        accum_env.add(OrdEnvElem::TVar(
+                            ident.to_owned(),
+                            Type::Monotype(Monotype::EVar(evar.to_owned())),
+                        ))
+                    });
+
+            check_expr(
+                *body,
+                Type::Monotype(Monotype::EVar(res_type.clone())),
+                new_env,
+            )?
+            .split_on(&unique_marker)
+            .map(|(before_env, _, _)| InferOut {
+                typ: Type::Func(
+                    arg_evars
+                        .iter()
+                        .map(|(_, evar)| Type::Monotype(Monotype::EVar(evar.to_owned())))
+                        .collect(),
+                    Box::new(Type::Monotype(Monotype::EVar(res_type))),
+                ),
+                env: before_env,
+            })
+            .ok_or(TypeError::OrdEnvElemNotFound(unique_marker))
+        }
         _ => todo!(),
     }
 }
@@ -70,6 +119,7 @@ fn check_expr(expr: AST, typ: Type, env: OrdEnv) -> Result<OrdEnv, TypeError> {
                 .map(|tuple| tuple.0)
                 .ok_or(TypeError::UVarNotFound(uvar))
         }
+        // ->I
         (AST::Lambda(ast_args, ast_body), Type::Func(arg_types, res_type))
             if ast_args.len() == arg_types.len() =>
         {
