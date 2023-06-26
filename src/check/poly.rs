@@ -224,6 +224,20 @@ fn apply_type(func_type: Type, args: Vec<AST>, env: OrdEnv) -> Result<InferOut, 
                 env: out_env,
             })
         }
+        // ->App
+        Type::Func(type_args, res) => type_args
+            .iter()
+            .zip(args.iter())
+            .fold(
+                Ok(env),
+                |in_env_or_err: Result<OrdEnv, TypeError>, (arg_type, arg)| {
+                    let in_env = in_env_or_err?;
+                    let check_out = check_expr(arg.clone(), arg_type.clone(), in_env.clone())?;
+
+                    Ok(in_env.concat(&check_out))
+                },
+            )
+            .map(|env| InferOut { typ: *res, env }),
         _ => todo!(),
     }
 }
