@@ -173,6 +173,57 @@ fn apply_type(func_type: Type, args: Vec<AST>, env: OrdEnv) -> Result<InferOut, 
 
             apply_type(substituted_type, args, new_env)
         }
+        // We _need_ an a-normal form transform
+        // \hat{alpha}App
+        Type::Monotype(Monotype::EVar(evar)) => {
+            let (before_env, _, after_env) = env
+                .split_on(&OrdEnvElem::EVar(evar.clone()))
+                .ok_or(TypeError::EVarNotFound(evar.clone()))?;
+
+            let args_and_evars: Vec<(AST, EVar)> =
+                args.iter().fold(Vec::new(), |args_and_evars, arg| {
+                    args_and_evars.push_immutable(&(arg.to_owned(), EVar::new_unique()))
+                });
+
+            let res_evar = EVar::new_unique();
+
+            let env_evars: Vec<OrdEnvElem> = args_and_evars
+                .iter()
+                .map(|(_, evar)| OrdEnvElem::EVar(evar.to_owned()))
+                .collect::<Vec<OrdEnvElem>>()
+                .push_immutable(&OrdEnvElem::EVar(res_evar.clone()));
+
+            let monotype_evars: Vec<Monotype> = args_and_evars
+                .iter()
+                .map(|(_, evar)| Monotype::EVar(evar.to_owned()))
+                .collect::<Vec<Monotype>>();
+
+            let solution = OrdEnvElem::ESol(
+                evar,
+                Monotype::Func(monotype_evars, Box::new(Monotype::EVar(res_evar.clone()))),
+            );
+
+            let new_env = before_env
+                .add_all(env_evars)
+                .add(solution)
+                .concat(&after_env);
+
+            let out_env = args_and_evars
+                .iter()
+                .fold(Ok(new_env), |env_or_err, (arg, evar)| {
+                    let in_env = env_or_err?;
+                    check_expr(
+                        arg.clone(),
+                        Type::Monotype(Monotype::EVar(evar.to_owned())),
+                        in_env,
+                    )
+                })?;
+
+            Ok(InferOut {
+                typ: Type::Monotype(Monotype::EVar(res_evar)),
+                env: out_env,
+            })
+        }
         _ => todo!(),
     }
 }
