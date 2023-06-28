@@ -7,6 +7,7 @@ use crate::check::{EVar, Expected, Given, Ident, Lit, Monotype, Type, TypeError,
 use crate::data::AST;
 use crate::utils::{UniqueString, VecUtils};
 
+#[derive(Debug, Eq, PartialEq)]
 struct InferOut {
     typ: Type,
     env: OrdEnv,
@@ -147,6 +148,8 @@ fn check_expr(expr: AST, typ: Type, env: OrdEnv) -> Result<OrdEnv, TypeError> {
                 .map(|(before_env, _, _)| before_env)
                 .ok_or(TypeError::OrdEnvElemNotFound(unique_env_elem))
         }
+        //
+        (AST::Let(var, assigned_expr, body_expr), _) => todo!(),
         // Sub
         (_, _) => {
             let InferOut {
@@ -239,5 +242,49 @@ fn apply_type(func_type: Type, args: Vec<AST>, env: OrdEnv) -> Result<InferOut, 
             )
             .map(|env| InferOut { typ: *res, env }),
         _ => todo!(),
+    }
+}
+
+// todo: implement let binding by thinking about how a lambda would handle it!
+//
+// todo: make sure we only create evars that are unique?
+//
+// todo: implement a-normal form pass?
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn prim_1() {
+        let ast = AST::Lit(Lit::I64(7));
+
+        let out = infer_expr(ast, OrdEnv::new());
+
+        assert_eq!(
+            out,
+            Ok(InferOut {
+                typ: Type::Monotype(Monotype::I64),
+                env: OrdEnv::new()
+            })
+        )
+    }
+
+    #[test]
+    fn prim_2() {
+        let ast = AST::Lit(Lit::List(vec![Lit::I64(4), Lit::I64(5)]));
+
+        let out = infer_expr(ast, OrdEnv::new());
+
+        assert_eq!(
+            out,
+            Ok(InferOut {
+                typ: Type::Monotype(Monotype::List(Box::new(Monotype::I64))),
+                env: OrdEnv::new()
+            })
+        )
+    }
+
+    #[test]
+    fn lambda_1() {
     }
 }
