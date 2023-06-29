@@ -284,7 +284,148 @@ mod test {
         )
     }
 
+    // TODO: weird error involving EVars when we attempt to infer the type of the polymorphic
+    // identity function
     #[test]
     fn lambda_1() {
+        let ast = AST::Lambda(
+            vec![Ident("y".to_string())],
+            Box::new(AST::Var(Ident("y".to_string()))),
+        );
+
+        let out = check_expr(
+            ast,
+            Type::Forall(
+                UVar("a".to_string()),
+                Box::new(Type::Func(
+                    vec![Type::Monotype(Monotype::UVar(UVar("a".to_string())))],
+                    Box::new(Type::Monotype(Monotype::UVar(UVar("a".to_string())))),
+                )),
+            ),
+            OrdEnv::new(),
+        );
+
+        assert_eq!(out, Ok(OrdEnv::new()))
+    }
+
+    #[test]
+    fn lambda_1_err() {
+        let ast = AST::Lambda(
+            vec![Ident("y".to_string())],
+            Box::new(AST::Var(Ident("y".to_string()))),
+        );
+
+        let out = check_expr(
+            ast,
+            Type::Forall(
+                UVar("a".to_string()),
+                Box::new(Type::Forall(
+                    UVar("b".to_string()),
+                    Box::new(Type::Func(
+                        vec![Type::Monotype(Monotype::UVar(UVar("a".to_string())))],
+                        Box::new(Type::Monotype(Monotype::UVar(UVar("b".to_string())))),
+                    )),
+                )),
+            ),
+            OrdEnv::new(),
+        );
+
+        assert_eq!(
+            out,
+            Err(TypeError::SubtypeMismatch(
+                Expected(Type::Monotype(Monotype::UVar(UVar("a".to_string())))),
+                Given(Type::Monotype(Monotype::UVar(UVar("b".to_string()))))
+            ))
+        )
+    }
+
+    #[test]
+    fn lambda_2() {
+        let ast = AST::Lambda(
+            vec![Ident("y".to_string()), Ident("x".to_string())],
+            Box::new(AST::Var(Ident("y".to_string()))),
+        );
+
+        let out = check_expr(
+            ast,
+            Type::Forall(
+                UVar("a".to_string()),
+                Box::new(Type::Forall(
+                    UVar("b".to_string()),
+                    Box::new(Type::Func(
+                        vec![
+                            Type::Monotype(Monotype::UVar(UVar("a".to_string()))),
+                            Type::Monotype(Monotype::UVar(UVar("b".to_string()))),
+                        ],
+                        Box::new(Type::Monotype(Monotype::UVar(UVar("a".to_string())))),
+                    )),
+                )),
+            ),
+            OrdEnv::new(),
+        );
+
+        assert_eq!(out, Ok(OrdEnv::new()))
+    }
+
+    #[test]
+    fn lambda_2_err() {
+        let ast = AST::Lambda(
+            vec![Ident("y".to_string()), Ident("x".to_string())],
+            Box::new(AST::Var(Ident("y".to_string()))),
+        );
+
+        let out = check_expr(
+            ast,
+            Type::Forall(
+                UVar("a".to_string()),
+                Box::new(Type::Forall(
+                    UVar("b".to_string()),
+                    Box::new(Type::Func(
+                        vec![
+                            Type::Monotype(Monotype::UVar(UVar("a".to_string()))),
+                            Type::Monotype(Monotype::UVar(UVar("b".to_string()))),
+                        ],
+                        Box::new(Type::Monotype(Monotype::UVar(UVar("b".to_string())))),
+                    )),
+                )),
+            ),
+            OrdEnv::new(),
+        );
+
+        assert_eq!(
+            out,
+            Err(TypeError::SubtypeMismatch(
+                Expected(Type::Monotype(Monotype::UVar(UVar("a".to_string())))),
+                Given(Type::Monotype(Monotype::UVar(UVar("b".to_string()))))
+            ))
+        )
+    }
+
+    #[test]
+    fn lambda_3() {
+        let ast = AST::Lambda(
+            vec![Ident("x".to_string()), Ident("y".to_string())],
+            Box::new(AST::Var(Ident("y".to_string()))),
+        );
+
+        let out = check_expr(
+            ast,
+            Type::Forall(
+                UVar("a".to_string()),
+                Box::new(Type::Forall(
+                    UVar("b".to_string()),
+                    Box::new(Type::Func(
+                        vec![
+                            Type::Monotype(Monotype::UVar(UVar("a".to_string()))),
+                            Type::Monotype(Monotype::UVar(UVar("b".to_string()))),
+                        ],
+                        Box::new(Type::Monotype(Monotype::UVar(UVar("b".to_string())))),
+                    )),
+                )),
+            ),
+            OrdEnv::new(),
+        );
+
+        assert_eq!(out, Ok(OrdEnv::new()))
     }
 }
