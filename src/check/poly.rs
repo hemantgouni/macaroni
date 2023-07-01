@@ -109,7 +109,11 @@ fn infer_expr(expr: AST, env: OrdEnv) -> Result<InferOut, TypeError> {
                 env: lambda_out_env,
             } = infer_expr(*lambda, env)?;
 
-            apply_type(lambda_out_env.substitute(lambda_type), args, lambda_out_env)
+            apply_type(
+                lambda_out_env.substitute_fixpoint(lambda_type),
+                args,
+                lambda_out_env,
+            )
         }
         _ => todo!(),
     }
@@ -163,8 +167,8 @@ fn check_expr(expr: AST, typ: Type, env: OrdEnv) -> Result<OrdEnv, TypeError> {
             } = infer_expr(expr, env)?;
 
             subtype(
-                out_env.substitute(expr_type),
-                out_env.substitute(typ),
+                out_env.substitute_fixpoint(expr_type),
+                out_env.substitute_fixpoint(typ),
                 out_env,
             )
         }
@@ -250,8 +254,30 @@ fn apply_type(func_type: Type, args: Vec<AST>, env: OrdEnv) -> Result<InferOut, 
                 },
             )
             .map(|env| InferOut { typ: *res, env }),
+        Type::Monotype(Monotype::Func(type_args, res)) => {
+            let type_args: Vec<Type> = type_args
+                .iter()
+                .map(|arg| Type::Monotype(arg.to_owned()))
+                .collect();
+
+            let type_res = Box::new(Type::Monotype(*res));
+
+            let type_func = Type::Func(type_args, type_res);
+
+            apply_type(type_func, args, env)
+        }
         _ => todo!(),
     }
+}
+
+// we can't simply replace all the free evars with uvars that are bound by a quantifier over the
+// type for the lambda bc of closures
+fn quantify_free_evars(typ: Type) -> Type {
+    let free_evars: Vec<EVar> = typ.free_evars();
+
+    // Type::Forall
+
+    todo!()
 }
 
 // todo: implement let binding by thinking about how a lambda would handle it!
@@ -438,22 +464,6 @@ mod test {
         assert_eq!(out, Ok(OrdEnv::new()))
     }
 
-    // note: we MUST NOT use randomly generated (evar) names in tests! since these depend on global
-    // state and lead to flaky tests (tests are NOT guaranteed to be run in the same order always)
-    #[test]
-    fn lambda_infer_1() {
-        let ast = AST::Lambda(
-            vec![Ident("x".to_string())],
-            Box::new(AST::Var(Ident("x".to_string()))),
-        );
-
-        let InferOut { typ, env } = infer_expr(ast, OrdEnv::new()).unwrap();
-
-        dbg!(typ.clone(), env.clone(), env.substitute(typ));
-
-        panic!()
-    }
-
     // we maybe need to be more clever about env.substitute, which should follow the
     // correct path through ESols
 
@@ -469,6 +479,53 @@ mod test {
         let InferOut { typ, env } = infer_expr(ast_app, OrdEnv::new()).unwrap();
 
         // maybe we need to substitute more in general?
-        assert_eq!(env.substitute(typ), Type::Monotype(Monotype::I64))
+        assert_eq!(env.substitute_fixpoint(typ), Type::Monotype(Monotype::I64))
+    }
+
+    // note: we MUST NOT use randomly generated (evar) names in tests! since these depend on global
+    // state and lead to flaky tests (tests are NOT guaranteed to be run in the same order always)
+    #[test]
+    fn app_infer_closure_1() {
+        let ast_lambda = AST::Lambda(
+            vec![Ident("x".to_string())],
+            Box::new(AST::Lambda(
+                vec![Ident("y".to_string())],
+                Box::new(AST::Var(Ident("x".to_string()))),
+            )),
+        );
+
+        let ast = AST::App(Box::new(ast_lambda), vec![AST::Lit(Lit::I64(5))]);
+
+        let InferOut { typ, env } = infer_expr(ast, OrdEnv::new()).unwrap();
+
+        match env.substitute_fixpoint(typ) {
+            Type::Monotype(Monotype::Func(arguments, result)) => {
+                match (arguments.as_slice(), *result) {
+                    ([Monotype::EVar(EVar(_))], Monotype::I64) => (),
+                    other => panic!("Expected EVar(EVar(_)) -> I64, got {:?}", other),
+                }
+            }
+            other => panic!("Expected Monotype(Func(_)), got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn app_infer_closure_2() {
+        let ast_lambda = AST::Lambda(
+            vec![Ident("x".to_string())],
+            Box::new(AST::Lambda(
+                vec![Ident("y".to_string())],
+                Box::new(AST::Var(Ident("x".to_string()))),
+            )),
+        );
+
+        let ast = AST::App(
+            Box::new(AST::App(Box::new(ast_lambda), vec![AST::Lit(Lit::I64(5))])),
+            vec![AST::Lit(Lit::Bool(true))],
+        );
+
+        let InferOut { typ, .. } = infer_expr(ast, OrdEnv::new()).unwrap();
+
+        assert_eq!(typ, Type::Monotype(Monotype::I64))
     }
 }

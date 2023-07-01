@@ -43,15 +43,15 @@ pub fn subtype(left: Type, right: Type, env: OrdEnv) -> Result<OrdEnv, TypeError
                     .fold(Ok(env), |env, (arg1, arg2)| {
                         let env = env?;
                         subtype(
-                            env.substitute(arg2.to_owned()),
-                            env.substitute(arg1.to_owned()),
+                            env.substitute_fixpoint(arg2.to_owned()),
+                            env.substitute_fixpoint(arg1.to_owned()),
                             env,
                         )
                     })?;
 
             let res_out_env: OrdEnv = subtype(
-                arg_out_env.substitute(*res1),
-                arg_out_env.substitute(*res2),
+                arg_out_env.substitute_fixpoint(*res1),
+                arg_out_env.substitute_fixpoint(*res2),
                 arg_out_env,
             )?;
 

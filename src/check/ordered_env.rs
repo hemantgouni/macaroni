@@ -119,7 +119,7 @@ impl OrdEnv {
         }
     }
 
-    pub fn substitute(&self, typ: Type) -> Type {
+    fn substitute(&self, typ: Type) -> Type {
         match typ {
             Type::Forall(uvar, typ) => Type::Forall(uvar, Box::new(self.substitute(*typ))),
             Type::Func(arg_types, res_type) => Type::Func(
@@ -130,6 +130,17 @@ impl OrdEnv {
                 Box::new(self.substitute(*res_type)),
             ),
             Type::Monotype(monotype) => Type::Monotype(self.substitute_mono(monotype)),
+        }
+    }
+
+    // performs multiple serial substitutions if needed
+    pub fn substitute_fixpoint(&self, input: Type) -> Type {
+        let substituted = self.substitute(input.clone());
+
+        if input == substituted {
+            substituted
+        } else {
+            self.substitute_fixpoint(substituted)
         }
     }
 }

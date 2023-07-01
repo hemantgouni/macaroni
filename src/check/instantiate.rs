@@ -82,7 +82,7 @@ pub fn instantiate_left(left: EVar, right: Type, env: OrdEnv) -> Result<OrdEnv, 
                         |env_or_err: Result<OrdEnv, TypeError>, pair| {
                             let in_env = env_or_err?;
                             instantiate_right(
-                                in_env.substitute(pair.0.to_owned()),
+                                in_env.substitute_fixpoint(pair.0.to_owned()),
                                 pair.1.to_owned(),
                                 in_env,
                             )
@@ -91,7 +91,7 @@ pub fn instantiate_left(left: EVar, right: Type, env: OrdEnv) -> Result<OrdEnv, 
                     .and_then(|in_env| {
                         instantiate_left(
                             res_pair.1,
-                            in_env.substitute(res_pair.0.to_owned()),
+                            in_env.substitute_fixpoint(res_pair.0.to_owned()),
                             in_env,
                         )
                     })
@@ -161,8 +161,6 @@ pub fn instantiate_right(left: Type, right: EVar, env: OrdEnv) -> Result<OrdEnv,
                     )
                     .concat(&right_env);
 
-                dbg!(new_env_init.clone());
-
                 arg_pairs
                     .iter()
                     .fold(
@@ -171,14 +169,14 @@ pub fn instantiate_right(left: Type, right: EVar, env: OrdEnv) -> Result<OrdEnv,
                             let in_env = env_or_err?;
                             instantiate_left(
                                 pair.1.to_owned(),
-                                in_env.substitute(pair.0.to_owned()),
+                                in_env.substitute_fixpoint(pair.0.to_owned()),
                                 in_env,
                             )
                         },
                     )
                     .and_then(|in_env| {
                         instantiate_right(
-                            in_env.substitute(res_pair.0.to_owned()),
+                            in_env.substitute_fixpoint(res_pair.0.to_owned()),
                             res_pair.1,
                             in_env,
                         )
@@ -195,11 +193,9 @@ pub fn instantiate_right(left: Type, right: EVar, env: OrdEnv) -> Result<OrdEnv,
                     .add(unique_marker.clone())
                     .add(OrdEnvElem::EVar(EVar(name.clone())));
 
-                dbg!(new_env_init.clone());
-
                 instantiate_right(
-                    dbg!(typ.substitute(&UVar(name.clone()), &EVar(name.clone()))),
-                    dbg!(right),
+                    typ.substitute(&UVar(name.clone()), &EVar(name.clone())),
+                    right,
                     new_env_init,
                 )?
                 .split_on(&unique_marker)
