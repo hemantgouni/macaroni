@@ -34,6 +34,7 @@ fn infer_lit(expr: Lit) -> Result<Monotype, TypeError> {
 }
 
 fn infer_expr(expr: AST, env: OrdEnv) -> Result<InferOut, TypeError> {
+    println!("Infer\n========\nexpr: {:#?}\nenv: {:#?}\n", expr, env);
     match expr {
         // Var
         AST::Var(name) => env
@@ -115,6 +116,10 @@ fn infer_expr(expr: AST, env: OrdEnv) -> Result<InferOut, TypeError> {
 }
 
 fn check_expr(expr: AST, typ: Type, env: OrdEnv) -> Result<OrdEnv, TypeError> {
+    println!(
+        "Check\n========\nexpr: {:#?}\ntype: {:#?}\nenv: {:#?}\n",
+        expr, typ, env
+    );
     match (expr.clone(), typ.clone()) {
         // ForallI
         (_, Type::Forall(uvar, typ)) => {
@@ -167,6 +172,10 @@ fn check_expr(expr: AST, typ: Type, env: OrdEnv) -> Result<OrdEnv, TypeError> {
 }
 
 fn apply_type(func_type: Type, args: Vec<AST>, env: OrdEnv) -> Result<InferOut, TypeError> {
+    println!(
+        "Apply\n========\ntype: {:#?}\nargs: {:#?}\nenv: {:#?}\n",
+        func_type, args, env
+    );
     match func_type {
         // ForallApp
         Type::Forall(UVar(str), quantified_type) => {
@@ -427,5 +436,39 @@ mod test {
         );
 
         assert_eq!(out, Ok(OrdEnv::new()))
+    }
+
+    // note: we MUST NOT use randomly generated (evar) names in tests! since these depend on global
+    // state and lead to flaky tests (tests are NOT guaranteed to be run in the same order always)
+    #[test]
+    fn lambda_infer_1() {
+        let ast = AST::Lambda(
+            vec![Ident("x".to_string())],
+            Box::new(AST::Var(Ident("x".to_string()))),
+        );
+
+        let InferOut { typ, env } = infer_expr(ast, OrdEnv::new()).unwrap();
+
+        dbg!(typ.clone(), env.clone(), env.substitute(typ));
+
+        panic!()
+    }
+
+    // we maybe need to be more clever about env.substitute, which should follow the
+    // correct path through ESols
+
+    #[test]
+    fn app_infer_1() {
+        let ast_lambda = AST::Lambda(
+            vec![Ident("x".to_string())],
+            Box::new(AST::Var(Ident("x".to_string()))),
+        );
+
+        let ast_app = AST::App(Box::new(ast_lambda), vec![AST::Lit(Lit::I64(5))]);
+
+        let InferOut { typ, env } = infer_expr(ast_app, OrdEnv::new()).unwrap();
+
+        // maybe we need to substitute more in general?
+        assert_eq!(env.substitute(typ), Type::Monotype(Monotype::I64))
     }
 }

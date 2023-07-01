@@ -5,10 +5,10 @@ use crate::check::{EVar, Monotype, Type, TypeError, UVar};
 use crate::utils::{get_unique_id, UniqueString};
 
 pub fn instantiate_left(left: EVar, right: Type, env: OrdEnv) -> Result<OrdEnv, TypeError> {
-    dbg!("Instantiate left:");
-    dbg!(left.clone());
-    dbg!(right.clone());
-    dbg!(env.clone());
+    println!(
+        "Instantiate Left\n========\nleft: {:#?}\nright: {:#?}\nenv: {:#?}\n",
+        left, right, env
+    );
     match right {
         // InstLSolve
         Type::Monotype(typ) => match env.split_on(&OrdEnvElem::EVar(left.clone())) {
@@ -120,6 +120,10 @@ pub fn instantiate_left(left: EVar, right: Type, env: OrdEnv) -> Result<OrdEnv, 
 }
 
 pub fn instantiate_right(left: Type, right: EVar, env: OrdEnv) -> Result<OrdEnv, TypeError> {
+    println!(
+        "Instantiate Right\n========\nleft: {:#?}\nright: {:#?}\nenv: {:#?}\n",
+        left, right, env
+    );
     match left {
         // InstRSolve, InstRReach
         Type::Monotype(_) => instantiate_left(right, left, env),

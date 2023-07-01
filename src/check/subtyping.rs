@@ -6,6 +6,7 @@ use crate::utils::UniqueString;
 // see 'figure 9: algorithmic subtyping' for rules
 
 pub fn subtype(left: Type, right: Type, env: OrdEnv) -> Result<OrdEnv, TypeError> {
+    println!("Subtype\n========\n{:#?}\n<:\n{:#?}\nenv: {:#?}\n", left, right, env);
     match (left, right) {
         // <: Var
         (Type::Monotype(Monotype::UVar(uvar1)), Type::Monotype(Monotype::UVar(uvar2)))
@@ -32,12 +33,6 @@ pub fn subtype(left: Type, right: Type, env: OrdEnv) -> Result<OrdEnv, TypeError
             } else {
                 Err(TypeError::EVarNotFound(evar1))
             }
-        }
-        (Type::Monotype(Monotype::EVar(evar1)), Type::Monotype(Monotype::EVar(evar2))) => {
-            Err(TypeError::SubtypeMismatch(
-                Expected(Type::Monotype(Monotype::EVar(evar1))),
-                Given(Type::Monotype(Monotype::EVar(evar2))),
-            ))
         }
         // <: ->
         (Type::Func(args1, res1), Type::Func(args2, res2)) => {
