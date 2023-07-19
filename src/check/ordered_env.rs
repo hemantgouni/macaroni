@@ -143,6 +143,16 @@ impl OrdEnv {
             self.substitute_fixpoint(substituted)
         }
     }
+
+    pub fn unsolved_evars(&self) -> Vec<EVar> {
+        self.0
+            .iter()
+            .filter_map(|env_elem| match env_elem {
+                OrdEnvElem::EVar(evar) => Some(evar.to_owned()),
+                _ => None,
+            })
+            .collect()
+    }
 }
 
 #[cfg(test)]

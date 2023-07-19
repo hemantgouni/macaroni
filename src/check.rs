@@ -13,6 +13,12 @@ use crate::utils::VecUtils;
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct UVar(pub String);
 
+impl UVar {
+    pub fn new_unique() -> UVar {
+        UVar(crate::utils::get_unique_id())
+    }
+}
+
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct EVar(pub String);
 
@@ -80,6 +86,35 @@ impl Type {
         }
     }
 
+    pub fn generalize(&self, target: &EVar, replacement: &UVar) -> Self {
+        Type::Forall(
+            replacement.to_owned(),
+            Box::new(self.generalize_helper(target, replacement)),
+        )
+    }
+
+    fn generalize_helper(&self, target: &EVar, replacement: &UVar) -> Self {
+        match self {
+            // Could replace here, but compiler-generated names should never conflict and
+            // the a-normal form transform should make this case impossible!
+            Type::Forall(uvar, _) if replacement == uvar => {
+                panic!("Encountered conflicting binding for uvar.")
+            }
+            Type::Forall(uvar, typ) => Type::Forall(
+                uvar.to_owned(),
+                Box::new((*typ).generalize_helper(target, replacement)),
+            ),
+            Type::Func(arg_types, res_type) => Type::Func(
+                arg_types
+                    .iter()
+                    .map(|arg_type| arg_type.generalize_helper(target, replacement))
+                    .collect(),
+                Box::new(res_type.generalize_helper(target, replacement)),
+            ),
+            Type::Monotype(monotype) => Type::Monotype(monotype.generalize(target, replacement)),
+        }
+    }
+
     pub fn free_evars(&self) -> Vec<EVar> {
         match self {
             Type::Forall(UVar(uvar_str), type_quantified) => type_quantified
@@ -115,6 +150,9 @@ impl Monotype {
     fn substitute(&self, target: &UVar, replacement: &EVar) -> Self {
         match self {
             Monotype::UVar(uvar) if target == uvar => Monotype::EVar(replacement.to_owned()),
+            Monotype::EVar(evar) if replacement == evar => {
+                panic!("Name collision while substituting: {:?}", evar)
+            }
             Monotype::List(monotype) => {
                 Monotype::List(Box::new(monotype.substitute(target, replacement)))
             }
@@ -124,6 +162,26 @@ impl Monotype {
                     .map(|arg_type| arg_type.substitute(target, replacement))
                     .collect(),
                 Box::new(res_type.substitute(target, replacement)),
+            ),
+            _ => self.to_owned(),
+        }
+    }
+
+    fn generalize(&self, target: &EVar, replacement: &UVar) -> Self {
+        match self {
+            Monotype::EVar(evar) if target == evar => Monotype::UVar(replacement.to_owned()),
+            Monotype::UVar(uvar) if replacement == uvar => {
+                panic!("Name collision while generalizing: {:?}", uvar)
+            }
+            Monotype::List(monotype) => {
+                Monotype::List(Box::new(monotype.generalize(target, replacement)))
+            }
+            Monotype::Func(arg_types, res_type) => Monotype::Func(
+                arg_types
+                    .iter()
+                    .map(|arg_type| arg_type.generalize(target, replacement))
+                    .collect(),
+                Box::new(res_type.generalize(target, replacement)),
             ),
             _ => self.to_owned(),
         }

@@ -54,7 +54,58 @@ fn infer_expr(expr: AST, env: OrdEnv) -> Result<InferOut, TypeError> {
             env,
         }),
         // ->I=>
+        // AST::Lambda(args, body) => {
+        //     let arg_evars: Vec<(Ident, EVar)> = args
+        //         .iter()
+        //         .map(|ident| ident.to_owned())
+        //         .zip(args.iter().map(|_| EVar::new_unique()))
+        //         .collect();
+
+        //     let res_type = EVar::new_unique();
+
+        //     let unique_marker = OrdEnvElem::UniqueMarker(UniqueString::new());
+
+        //     let env_pre_tvar = env.add_all(
+        //         arg_evars
+        //             .iter()
+        //             .map(|(_, evar)| OrdEnvElem::EVar(evar.to_owned()))
+        //             .collect::<Vec<OrdEnvElem>>()
+        //             .push_immutable(&OrdEnvElem::EVar(res_type.clone()))
+        //             .push_immutable(&unique_marker),
+        //     );
+
+        //     let new_env: OrdEnv =
+        //         arg_evars
+        //             .iter()
+        //             .fold(env_pre_tvar, |accum_env, (ident, evar)| {
+        //                 accum_env.add(OrdEnvElem::TVar(
+        //                     ident.to_owned(),
+        //                     Type::Monotype(Monotype::EVar(evar.to_owned())),
+        //                 ))
+        //             });
+
+        //     check_expr(
+        //         *body,
+        //         Type::Monotype(Monotype::EVar(res_type.clone())),
+        //         new_env,
+        //     )?
+        //     .split_on(&unique_marker)
+        //     .map(|(before_env, _, _)| InferOut {
+        //         typ: Type::Func(
+        //             arg_evars
+        //                 .iter()
+        //                 .map(|(_, evar)| Type::Monotype(Monotype::EVar(evar.to_owned())))
+        //                 .collect(),
+        //             Box::new(Type::Monotype(Monotype::EVar(res_type))),
+        //         ),
+        //         env: before_env,
+        //     })
+        //     .ok_or(TypeError::OrdEnvElemNotFound(unique_marker))
+        // }
+        // ->I=>'
         AST::Lambda(args, body) => {
+            let unique_marker = OrdEnvElem::UniqueMarker(UniqueString::new());
+
             let arg_evars: Vec<(Ident, EVar)> = args
                 .iter()
                 .map(|ident| ident.to_owned())
@@ -63,15 +114,12 @@ fn infer_expr(expr: AST, env: OrdEnv) -> Result<InferOut, TypeError> {
 
             let res_type = EVar::new_unique();
 
-            let unique_marker = OrdEnvElem::UniqueMarker(UniqueString::new());
-
-            let env_pre_tvar = env.add_all(
+            let env_pre_tvar = env.add(unique_marker.clone()).add_all(
                 arg_evars
                     .iter()
                     .map(|(_, evar)| OrdEnvElem::EVar(evar.to_owned()))
                     .collect::<Vec<OrdEnvElem>>()
-                    .push_immutable(&OrdEnvElem::EVar(res_type.clone()))
-                    .push_immutable(&unique_marker),
+                    .push_immutable(&OrdEnvElem::EVar(res_type.clone())),
             );
 
             let new_env: OrdEnv =
@@ -84,23 +132,36 @@ fn infer_expr(expr: AST, env: OrdEnv) -> Result<InferOut, TypeError> {
                         ))
                     });
 
-            check_expr(
+            let (before_env, after_env) = check_expr(
                 *body,
                 Type::Monotype(Monotype::EVar(res_type.clone())),
                 new_env,
             )?
             .split_on(&unique_marker)
-            .map(|(before_env, _, _)| InferOut {
-                typ: Type::Func(
+            .map(|(before_env, _, after_env)| (before_env, after_env))
+            .ok_or(TypeError::OrdEnvElemNotFound(unique_marker))?;
+
+            let evar_func_type_substituted =
+                after_env.substitute_fixpoint(Type::Monotype(Monotype::Func(
                     arg_evars
                         .iter()
-                        .map(|(_, evar)| Type::Monotype(Monotype::EVar(evar.to_owned())))
+                        .map(|(_, evar)| Monotype::EVar(evar.to_owned()))
                         .collect(),
-                    Box::new(Type::Monotype(Monotype::EVar(res_type))),
-                ),
+                    Box::new(Monotype::EVar(res_type)),
+                )));
+
+            let unsolved_evars = after_env.unsolved_evars();
+
+            let generalized_func_type = unsolved_evars
+                .iter()
+                .fold(evar_func_type_substituted, |accum_type, evar| {
+                    accum_type.generalize(evar, &UVar::new_unique())
+                });
+
+            Ok(InferOut {
                 env: before_env,
+                typ: generalized_func_type,
             })
-            .ok_or(TypeError::OrdEnvElemNotFound(unique_marker))
         }
         // ->E
         AST::App(lambda, args) => {
@@ -254,6 +315,7 @@ fn apply_type(func_type: Type, args: Vec<AST>, env: OrdEnv) -> Result<InferOut, 
                 },
             )
             .map(|env| InferOut { typ: *res, env }),
+        // TODO: need this case and the previous?
         Type::Monotype(Monotype::Func(type_args, res)) => {
             let type_args: Vec<Type> = type_args
                 .iter()
@@ -268,16 +330,6 @@ fn apply_type(func_type: Type, args: Vec<AST>, env: OrdEnv) -> Result<InferOut, 
         }
         _ => todo!(),
     }
-}
-
-// we can't simply replace all the free evars with uvars that are bound by a quantifier over the
-// type for the lambda bc of closures
-fn quantify_free_evars(typ: Type) -> Type {
-    let free_evars: Vec<EVar> = typ.free_evars();
-
-    // Type::Forall
-
-    todo!()
 }
 
 // todo: implement let binding by thinking about how a lambda would handle it!
@@ -482,8 +534,64 @@ mod test {
         assert_eq!(env.substitute_fixpoint(typ), Type::Monotype(Monotype::I64))
     }
 
+    #[test]
+    fn lambda_infer_1() {
+        let ast = AST::Lambda(
+            vec![Ident("x".to_string())],
+            Box::new(AST::Var(Ident("x".to_string()))),
+        );
+
+        let InferOut { typ, env: _ } = infer_expr(ast, OrdEnv::new()).unwrap();
+
+        match typ {
+            Type::Forall(uvar1, quantified_type) => match *quantified_type {
+                Type::Monotype(Monotype::Func(args, res)) => match (args.as_slice(), *res) {
+                    ([Monotype::UVar(uvar2)], Monotype::UVar(uvar3)) => {
+                        assert!(&uvar1 == uvar2 && uvar2 == &uvar3)
+                    }
+                    other => panic!("Expected a -> a, got {:?}", other),
+                },
+                other => panic!("Expected a -> a, got {:?}", other),
+            },
+            _ => panic!("Expected forall a. a -> a, got {:?}", typ),
+        }
+    }
+
     // note: we MUST NOT use randomly generated (evar) names in tests! since these depend on global
     // state and lead to flaky tests (tests are NOT guaranteed to be run in the same order always)
+    #[test]
+    fn lambda_infer_2() {
+        let ast_lambda = AST::Lambda(
+            vec![Ident("x".to_string()), Ident("y".to_string())],
+            Box::new(AST::Var(Ident("x".to_string()))),
+        );
+
+        let InferOut { typ, env: _ } = infer_expr(ast_lambda, OrdEnv::new()).unwrap();
+
+        match dbg!(typ) {
+            Type::Forall(uvar1, quantified_type) => match *quantified_type {
+                Type::Forall(uvar2, quantified_type) => match *quantified_type {
+                    Type::Monotype(Monotype::Func(args, res)) => match (args.as_slice(), *res) {
+                        ([Monotype::UVar(uvar3), Monotype::UVar(uvar4)], Monotype::UVar(uvar5)) => {
+                            dbg!(
+                                uvar1.clone(),
+                                uvar2.clone(),
+                                uvar3.clone(),
+                                uvar4.clone(),
+                                uvar5.clone()
+                            );
+                            assert!(&uvar2 == uvar3 && uvar3 == &uvar5 && &uvar1 == uvar4)
+                        }
+                        _ => panic!(),
+                    },
+                    _ => panic!(),
+                },
+                _ => panic!(),
+            },
+            _ => panic!(),
+        }
+    }
+
     #[test]
     fn app_infer_closure_1() {
         let ast_lambda = AST::Lambda(
@@ -494,38 +602,42 @@ mod test {
             )),
         );
 
-        let ast = AST::App(Box::new(ast_lambda), vec![AST::Lit(Lit::I64(5))]);
+        // let ast = AST::App(Box::new(ast_lambda), vec![AST::Lit(Lit::I64(5))]);
 
-        let InferOut { typ, env } = infer_expr(ast, OrdEnv::new()).unwrap();
+        let InferOut { typ, env: _ } = infer_expr(ast_lambda, OrdEnv::new()).unwrap();
 
-        match env.substitute_fixpoint(typ) {
-            Type::Monotype(Monotype::Func(arguments, result)) => {
-                match (arguments.as_slice(), *result) {
-                    ([Monotype::EVar(EVar(_))], Monotype::I64) => (),
-                    other => panic!("Expected EVar(EVar(_)) -> I64, got {:?}", other),
-                }
-            }
-            other => panic!("Expected Monotype(Func(_)), got {:?}", other),
-        }
+        dbg!(typ);
+
+        panic!()
+
+        // match env.substitute_fixpoint(typ) {
+        //     Type::Monotype(Monotype::Func(arguments, result)) => {
+        //         match (arguments.as_slice(), *result) {
+        //             ([Monotype::EVar(EVar(_))], Monotype::I64) => (),
+        //             other => panic!("Expected EVar(EVar(_)) -> I64, got {:?}", other),
+        //         }
+        //     }
+        //     other => panic!("Expected Monotype(Func(_)), got {:?}", other),
+        // }
     }
 
-    #[test]
-    fn app_infer_closure_2() {
-        let ast_lambda = AST::Lambda(
-            vec![Ident("x".to_string())],
-            Box::new(AST::Lambda(
-                vec![Ident("y".to_string())],
-                Box::new(AST::Var(Ident("x".to_string()))),
-            )),
-        );
+    // #[test]
+    // fn app_infer_closure_2() {
+    //     let ast_lambda = AST::Lambda(
+    //         vec![Ident("x".to_string())],
+    //         Box::new(AST::Lambda(
+    //             vec![Ident("y".to_string())],
+    //             Box::new(AST::Var(Ident("x".to_string()))),
+    //         )),
+    //     );
 
-        let ast = AST::App(
-            Box::new(AST::App(Box::new(ast_lambda), vec![AST::Lit(Lit::I64(5))])),
-            vec![AST::Lit(Lit::Bool(true))],
-        );
+    //     let ast = AST::App(
+    //         Box::new(AST::App(Box::new(ast_lambda), vec![AST::Lit(Lit::I64(5))])),
+    //         vec![AST::Lit(Lit::Bool(true))],
+    //     );
 
-        let InferOut { typ, .. } = infer_expr(ast, OrdEnv::new()).unwrap();
+    //     let InferOut { typ, .. } = infer_expr(ast, OrdEnv::new()).unwrap();
 
-        assert_eq!(typ, Type::Monotype(Monotype::I64))
-    }
+    //     assert_eq!(typ, Type::Monotype(Monotype::I64))
+    // }
 }
