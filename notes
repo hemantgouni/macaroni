@@ -1,4 +1,3 @@
-think about program-level type system
+ONLY propagate information down, and typecheck expansion? i think
 
-it's okay if macros lie to each other? return type versus ask expansion for
-type?
+https://github.umn.edu/melt/pubs/blob/master/drafts/2023_SLE_Forwarding_Patterns/forwarding_patterns.tex
