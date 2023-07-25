@@ -81,7 +81,8 @@ fn expand_expr(expr: AST, environment: Env<AST>) -> Result<AST, String> {
             actual_args.iter().fold(
                 Ok(Vec::new()),
                 |args: Result<Vec<AST>, String>, arg: &AST| {
-                    Ok(args?.append_immutable(&vec![expand_expr(arg.to_owned(), environment.clone())?]))
+                    Ok(args?
+                        .append_immutable(&vec![expand_expr(arg.to_owned(), environment.clone())?]))
                 },
             )?,
         )),
@@ -274,7 +275,8 @@ fn expand_top(forms: Vec<AST>, mut out_env: Env<AST>) -> Result<Vec<AST>, String
             )?))
         }
         [func_type_dec @ AST::TypeDec(.., Type::Func(..)), rest @ ..] => {
-            Ok(vec![func_type_dec.to_owned()].append_immutable(&expand_top(rest.to_vec(), out_env)?))
+            Ok(vec![func_type_dec.to_owned()]
+                .append_immutable(&expand_top(rest.to_vec(), out_env)?))
         }
         [expr, ..] => Ok(vec![expand_expr(expr.to_owned(), out_env)?.rewrite()]),
         [] => Err(
@@ -293,6 +295,47 @@ mod test {
     use super::*;
     use crate::evaluate::evaluate;
     use crate::parse::tokenize;
+
+    // what do we need to make this example work
+    //
+    // the type checker needs to look at the arguments to the macro (which still need to be
+    // parsed), parse them (not into symbols, but as usual), then see if the resulting thing is an
+    // i64
+    //
+    // remember, we don't need to evaluate the arguments to the macro to actually _get_ I64s
+    //
+    // we can simply expand the syntax as-is: the macro writer would simply like to know that their
+    // arguments are well-typed, and produce a nice error message if not
+    //
+    // this also means we do _not_ need to turn the arguments into not-symbols, but it _does_ mean
+    // that we-
+    //
+    // well, if a macro is expecting arguments of a certain type, those arguments must be derivable
+    // from the grammar of the base language (without macros)
+    //
+    // 1. Determine if the macro being called has a declared macrotype
+    // 2. If it does:
+    //    a. Assume the arguments to the macro are syntactically valid language constructs
+    //    b. Type check each argument to make sure it's the same as what was declared in the
+    //       macrotype
+    // 3. Otherwise:
+    //    a. Proceed with macro expansion as usual
+    #[test]
+    fn macrotype_expand() {
+        let program: Toplevel = tokenize(
+            "
+            ((fn exp (base exp)
+               (if (== exp 0)
+                 1
+                 (* base (exp base (- exp 1)))))
+             (declare-macrotype staged-exp (I64 I64))
+             (macro staged-exp (base expr)
+               (exp base expr)))
+            ",
+        )
+        .unwrap()
+        .parse_toplevel();
+    }
 
     #[test]
     fn test_expand_let() {

@@ -218,8 +218,8 @@ fn check_expr(expr: AST, typ: Type, env: OrdEnv) -> Result<OrdEnv, TypeError> {
                 .map(|(before_env, _, _)| before_env)
                 .ok_or(TypeError::OrdEnvElemNotFound(unique_env_elem))
         }
-        //
-        (AST::Let(var, assigned_expr, body_expr), _) => todo!(),
+        // Comparable to what we do for lambdas?
+        // (AST::Let(var, assigned_expr, body_expr), _) => todo!(),
         // Sub
         (_, _) => {
             let InferOut {
