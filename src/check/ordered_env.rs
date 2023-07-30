@@ -115,7 +115,7 @@ impl OrdEnv {
                     .collect(),
                 Box::new(self.substitute_mono(*res)),
             ),
-            Monotype::List(typ) => self.substitute_mono(*typ),
+            Monotype::List(typ) => Monotype::List(Box::new(self.substitute_mono(*typ))),
         }
     }
 

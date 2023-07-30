@@ -115,6 +115,76 @@ fn infer_expr(expr: AST, env: OrdEnv) -> Result<InferOut, TypeError> {
                 lambda_out_env,
             )
         }
+        AST::Emptyp(list) => {
+            let new_evar = EVar::new_unique();
+
+            let unique_marker = OrdEnvElem::UniqueMarker(UniqueString::new());
+
+            let new_env = env
+                .add(unique_marker.clone())
+                .add(OrdEnvElem::EVar(new_evar.clone()));
+
+            let out_env = check_expr(
+                *list,
+                Type::Monotype(Monotype::List(Box::new(Monotype::EVar(new_evar)))),
+                new_env,
+            )?;
+
+            Ok(InferOut {
+                typ: Type::Monotype(Monotype::Bool),
+                env: out_env
+                    .split_on(&unique_marker)
+                    .ok_or(TypeError::OrdEnvElemNotFound(unique_marker))
+                    .map(|(before_env, _, _)| before_env)?,
+            })
+        }
+        AST::Cons(elem, list) => {
+            let InferOut {
+                typ: elem_type,
+                env: elem_env,
+            } = infer_expr(*elem, env)?;
+
+            match elem_type {
+                Type::Monotype(elem_monotype) => {
+                    let list_type = Type::Monotype(Monotype::List(Box::new(elem_monotype)));
+                    // use elem_env here just in case elem_monotype is (or contains) an existential
+                    // that was introduced during inference
+                    check_expr(*list, list_type.clone(), elem_env).map(|env| InferOut {
+                        typ: dbg!(env.substitute_fixpoint(list_type)),
+                        env,
+                    })
+                }
+                _ => Err(TypeError::ImpredicativeForall(elem_type)),
+            }
+        }
+        AST::Car(list) => {
+            let list_evar = EVar::new_unique();
+
+            let list_type =
+                Type::Monotype(Monotype::List(Box::new(Monotype::EVar(list_evar.clone()))));
+
+            let unique_marker = OrdEnvElem::UniqueMarker(UniqueString::new());
+
+            check_expr(
+                *list,
+                list_type,
+                env.add(unique_marker.clone())
+                    .add(OrdEnvElem::EVar(list_evar.clone())),
+            )?
+            .split_on(&unique_marker)
+            .ok_or(TypeError::OrdEnvElemNotFound(unique_marker))
+            .map(|(before_env, _, after_env)| InferOut {
+                // should we be dropping the environment here? is it possible that existentials
+                // survive...? yes, it is (if they can't be solved? but is that an error)
+                env: before_env.clone(),
+                typ: before_env
+                    .concat(&after_env)
+                    .substitute_fixpoint(Type::Monotype(Monotype::EVar(list_evar))),
+            })
+        }
+        AST::Cdr(list) => {
+            todo!()
+        }
         _ => todo!(),
     }
 }
@@ -156,6 +226,11 @@ fn check_expr(expr: AST, typ: Type, env: OrdEnv) -> Result<OrdEnv, TypeError> {
                 .split_on(&unique_env_elem)
                 .map(|(before_env, _, _)| before_env)
                 .ok_or(TypeError::OrdEnvElemNotFound(unique_env_elem))
+        }
+        (AST::List(elems), Type::Monotype(Monotype::List(typ))) => {
+            elems.iter().fold(Ok(env), |res, elem| {
+                check_expr(elem.to_owned(), Type::Monotype(*typ.clone()), res?)
+            })
         }
         // Comparable to what we do for lambdas?
         // (AST::Let(var, assigned_expr, body_expr), _) => todo!(),
@@ -471,5 +546,51 @@ mod test {
 
         // maybe we need to substitute more in general?
         assert_eq!(env.substitute_fixpoint(typ), Type::Monotype(Monotype::I64))
+    }
+
+    #[test]
+    fn list_check_1() {
+        let ast_list = AST::List(vec![AST::Lit(Lit::I64(1))]);
+
+        let res = check_expr(
+            ast_list,
+            Type::Monotype(Monotype::List(Box::new(Monotype::I64))),
+            OrdEnv::new(),
+        );
+
+        assert!(matches!(res, Ok(_)))
+    }
+
+    #[test]
+    fn emptyp_infer_1() {
+        let ast_list = AST::List(vec![AST::Lit(Lit::I64(1))]);
+
+        let ast_emptyp = AST::Emptyp(Box::new(ast_list));
+
+        let InferOut { typ, .. } = infer_expr(ast_emptyp, OrdEnv::new()).unwrap();
+
+        assert_eq!(typ, Type::Monotype(Monotype::Bool));
+    }
+
+    #[test]
+    fn cons_infer_1() {
+        let ast_list = AST::List(vec![AST::Lit(Lit::I64(1))]);
+
+        let ast_cons = AST::Cons(Box::new(AST::Lit(Lit::I64(1))), Box::new(ast_list));
+
+        let InferOut { typ, .. } = infer_expr(ast_cons, OrdEnv::new()).unwrap();
+
+        assert_eq!(typ, Type::Monotype(Monotype::List(Box::new(Monotype::I64))));
+    }
+
+    #[test]
+    fn car_infer_1() {
+        let ast_list = AST::List(vec![AST::Lit(Lit::I64(1))]);
+
+        let ast_car = AST::Car(Box::new(ast_list));
+
+        let InferOut { typ, .. } = infer_expr(ast_car, OrdEnv::new()).unwrap();
+
+        assert_eq!(typ, Type::Monotype(Monotype::I64));
     }
 }
