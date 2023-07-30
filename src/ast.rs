@@ -1,5 +1,5 @@
 use crate::check::{Monotype, Type, UVar};
-use crate::data::{Elem, Ident, Lit, Toplevel, AST};
+use crate::data::{Elem, Ident, Lit, MacroErrorMsg, Toplevel, AST};
 
 fn quote_elem(elem: &Elem<String>) -> Lit {
     // Hey, this is basically the lexed representation of the code!!!!
@@ -185,6 +185,15 @@ impl Elem<String> {
                             // TODO: add tests for this case, it's not trivial
                             [Elem::Symbol(str), Elem::Symbol(ident), typ] if str == "declare" => {
                                 AST::TypeDec((*ident).as_str().into(), parse_type(typ))
+                            }
+                            [Elem::Symbol(str), Elem::Symbol(ident), typ, Elem::String(err)]
+                                if str == "declare-macrotype" =>
+                            {
+                                AST::MacroTypeDec(
+                                    (*ident).as_str().into(),
+                                    parse_type(typ),
+                                    MacroErrorMsg(err.to_string()),
+                                )
                             }
                             [Elem::Symbol(str), Elem::Symbol(ident), Elem::List(args), body]
                                 if str == "fn" =>

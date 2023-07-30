@@ -58,9 +58,13 @@ impl Lit {
 }
 
 #[derive(Debug, Eq, PartialEq, Clone)]
+pub struct MacroErrorMsg(pub String);
+
+#[derive(Debug, Eq, PartialEq, Clone)]
 pub enum AST {
     Type(Type, Box<AST>),
     TypeDec(Ident, Type),
+    MacroTypeDec(Ident, Type, MacroErrorMsg),
     Lambda(Vec<Ident>, Box<AST>),
     App(Box<AST>, Vec<AST>),
     Func(Ident, Vec<Ident>, Box<AST>),
@@ -98,6 +102,7 @@ impl AST {
         match self {
             AST::Type(typ, expr) => AST::Type(typ, Box::new(Self::rewrite(*expr))),
             AST::TypeDec(ident, typ) => AST::TypeDec(ident, typ),
+            AST::MacroTypeDec(ident, typ, err) => AST::MacroTypeDec(ident, typ, err),
             AST::Lambda(args, body) => AST::Lambda(args, Box::new(Self::rewrite(*body))),
             AST::App(lambda, args) => AST::App(
                 Box::new(Self::rewrite(*lambda)),
