@@ -4,7 +4,7 @@ use crate::check::ordered_env::{OrdEnv, OrdEnvElem};
 use crate::check::subtyping::subtype;
 use crate::check::well_formed::well_formed;
 use crate::check::{EVar, Expected, Given, Ident, Lit, Monotype, Type, TypeError, UVar};
-use crate::data::AST;
+use crate::data::{Toplevel, AST};
 use crate::utils::{UniqueString, VecUtils};
 
 #[derive(Debug, Eq, PartialEq)]
@@ -183,7 +183,47 @@ fn infer_expr(expr: AST, env: OrdEnv) -> Result<InferOut, TypeError> {
             })
         }
         AST::Cdr(list) => {
-            todo!()
+            let list_evar = EVar::new_unique();
+
+            let list_type =
+                Type::Monotype(Monotype::List(Box::new(Monotype::EVar(list_evar.clone()))));
+
+            let unique_marker = OrdEnvElem::UniqueMarker(UniqueString::new());
+
+            check_expr(
+                *list,
+                list_type,
+                env.add(unique_marker.clone())
+                    .add(OrdEnvElem::EVar(list_evar.clone())),
+            )?
+            .split_on(&unique_marker)
+            .ok_or(TypeError::OrdEnvElemNotFound(unique_marker))
+            .map(|(before_env, _, after_env)| InferOut {
+                // should we be dropping the environment here? is it possible that existentials
+                // survive...? yes, it is (if they can't be solved? but is that an error)
+                env: before_env.clone(),
+                typ: before_env
+                    .concat(&after_env)
+                    .substitute_fixpoint(Type::Monotype(Monotype::List(Box::new(Monotype::EVar(
+                        list_evar,
+                    ))))),
+            })
+        }
+        AST::Ite(guard, branch1, branch2) => {
+            let guard_env = check_expr(*guard, Type::Monotype(Monotype::Bool), env)?;
+
+            let InferOut {
+                typ: branch1_type,
+                env: branch1_env,
+                // must ALWAYS thread through the most recent environment!
+            } = infer_expr(*branch1, guard_env)?;
+
+            let branch2_env = check_expr(*branch2, branch1_type.clone(), branch1_env)?;
+
+            Ok(InferOut {
+                typ: branch1_type,
+                env: branch2_env,
+            })
         }
         _ => todo!(),
     }
@@ -346,6 +386,63 @@ fn apply_type(func_type: Type, args: Vec<AST>, env: OrdEnv) -> Result<InferOut, 
     }
 }
 
+fn make_binding_env(identifiers: Vec<Ident>, types: Vec<Type>) -> OrdEnv {
+    identifiers
+        .iter()
+        .zip(types.iter())
+        .fold(OrdEnv::new(), |env, (ident, ident_type)| {
+            env.add(OrdEnvElem::TVar(ident.to_owned(), ident_type.to_owned()))
+        })
+}
+
+fn peel_foralls(foralls: Type, env: OrdEnv) -> (Vec<Type>, Type, OrdEnv) {
+    match foralls {
+        Type::Forall(uvar, typ) => peel_foralls(*typ, env.add(OrdEnvElem::UVar(uvar))),
+        Type::Func(arg_types, res_type) => (arg_types, *res_type, env),
+        _ => panic!(
+            "Incorrect type variant passed to peel_foralls: {:?}",
+            foralls
+        ),
+    }
+}
+
+fn check_top(exprs: Vec<AST>, env: OrdEnv) -> Result<OrdEnv, TypeError> {
+    match exprs.as_slice() {
+        [AST::TypeDec(func, func_type), rest @ ..] => check_top(
+            rest.to_vec(),
+            env.add(OrdEnvElem::TVar(func.to_owned(), func_type.to_owned())),
+        ),
+        [AST::Func(name, args, body), rest @ ..] => {
+            let func_type = env
+                .type_for_tvar(name.to_owned())
+                .ok_or(TypeError::TVarNotFound(name.to_owned()))?;
+
+            match func_type {
+                Type::Func(arg_types, res_type) => {
+                    let args_env = env.concat(&make_binding_env(args.to_owned(), arg_types));
+
+                    check_expr(*body.to_owned(), *res_type, args_env)?;
+
+                    check_top(rest.to_vec(), env)
+                }
+                forall @ Type::Forall(..) => {
+                    let (arg_types, res_type, env_with_uvars) = peel_foralls(forall, env.clone());
+
+                    let args_env =
+                        env_with_uvars.concat(&make_binding_env(args.to_owned(), arg_types));
+
+                    check_expr(*body.to_owned(), res_type, args_env)?;
+
+                    check_top(rest.to_vec(), env)
+                }
+                _ => todo!(),
+            }
+        }
+        [] => todo!(),
+        _ => todo!(),
+    }
+}
+
 // todo: implement let binding by thinking about how a lambda would handle it!
 //
 // todo: make sure we only create evars that are unique?
@@ -354,6 +451,7 @@ fn apply_type(func_type: Type, args: Vec<AST>, env: OrdEnv) -> Result<InferOut, 
 #[cfg(test)]
 mod test {
     use super::*;
+    use crate::parse::tokenize;
 
     #[test]
     fn prim_1() {
@@ -592,5 +690,42 @@ mod test {
         let InferOut { typ, .. } = infer_expr(ast_car, OrdEnv::new()).unwrap();
 
         assert_eq!(typ, Type::Monotype(Monotype::I64));
+    }
+
+    #[test]
+    fn cdr_infer_1() {
+        let ast_list = AST::List(vec![AST::Lit(Lit::I64(1))]);
+
+        let ast_car = AST::Cdr(Box::new(ast_list));
+
+        let InferOut { typ, .. } = infer_expr(ast_car, OrdEnv::new()).unwrap();
+
+        assert_eq!(typ, Type::Monotype(Monotype::List(Box::new(Monotype::I64))));
+    }
+
+    #[test]
+    fn ite_infer_1() {
+        let ast_ite = tokenize("(if (empty? (list)) 1 2)").unwrap().parse();
+
+        let InferOut { typ, .. } = infer_expr(ast_ite, OrdEnv::new()).unwrap();
+
+        assert_eq!(typ, Type::Monotype(Monotype::I64))
+    }
+
+    #[test]
+    fn ite_infer_2() {
+        let ast_ite = tokenize("(if (empty? (list)) 1 (quote hey))")
+            .unwrap()
+            .parse();
+
+        let err = infer_expr(ast_ite, OrdEnv::new());
+
+        assert_eq!(
+            err,
+            Err(TypeError::SubtypeMismatch(
+                Expected(Type::Monotype(Monotype::Symbol)),
+                Given(Type::Monotype(Monotype::I64))
+            ))
+        )
     }
 }
