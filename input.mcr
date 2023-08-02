@@ -1,6 +1,6 @@
-((declare map (-> ((-> (I64) String) (List I64)) (List String)))
+((declare map (forall a (forall b (-> ((-> (a) b) (List a)) (List b)))))
  (fn map (f input-list)
   (if (empty? input-list)
    (list)
-   (cons (f (car input-list)) (map f (cdr input-list)))))
+   (cons (car input-list) (map f (cdr input-list)))))
  (map (lambda (elem) "hey") (list 1 4 7 8)))

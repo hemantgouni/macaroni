@@ -274,9 +274,8 @@ fn expand_top(forms: Vec<AST>, mut out_env: Env<AST>) -> Result<Vec<AST>, String
                 out_env.insert(ident.to_owned(), expanded_func),
             )?))
         }
-        [func_type_dec @ AST::TypeDec(.., Type::Func(..)), rest @ ..] => {
-            Ok(vec![func_type_dec.to_owned()]
-                .append_immutable(&expand_top(rest.to_vec(), out_env)?))
+        [type_dec @ AST::TypeDec(..), rest @ ..] => {
+            Ok(vec![type_dec.to_owned()].append_immutable(&expand_top(rest.to_vec(), out_env)?))
         }
         [expr, ..] => Ok(vec![expand_expr(expr.to_owned(), out_env)?.rewrite()]),
         [] => Err(

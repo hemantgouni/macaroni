@@ -130,6 +130,8 @@ fn infer_expr(expr: AST, env: OrdEnv) -> Result<InferOut, TypeError> {
                 new_env,
             )?;
 
+            // shouldn't be introducing any existentials here
+            // so it's correct to select before_env
             Ok(InferOut {
                 typ: Type::Monotype(Monotype::Bool),
                 env: out_env
@@ -165,11 +167,12 @@ fn infer_expr(expr: AST, env: OrdEnv) -> Result<InferOut, TypeError> {
 
             let unique_marker = OrdEnvElem::UniqueMarker(UniqueString::new());
 
+            // TODO: possible source of bugs?
             check_expr(
                 *list,
                 list_type,
-                env.add(unique_marker.clone())
-                    .add(OrdEnvElem::EVar(list_evar.clone())),
+                env.add(OrdEnvElem::EVar(list_evar.clone()))
+                    .add(unique_marker.clone()),
             )?
             .split_on(&unique_marker)
             .ok_or(TypeError::OrdEnvElemNotFound(unique_marker))
@@ -193,8 +196,8 @@ fn infer_expr(expr: AST, env: OrdEnv) -> Result<InferOut, TypeError> {
             check_expr(
                 *list,
                 list_type,
-                env.add(unique_marker.clone())
-                    .add(OrdEnvElem::EVar(list_evar.clone())),
+                env.add(OrdEnvElem::EVar(list_evar.clone()))
+                    .add(unique_marker.clone()),
             )?
             .split_on(&unique_marker)
             .ok_or(TypeError::OrdEnvElemNotFound(unique_marker))
@@ -225,7 +228,14 @@ fn infer_expr(expr: AST, env: OrdEnv) -> Result<InferOut, TypeError> {
                 env: branch2_env,
             })
         }
-        _ => todo!(),
+        AST::Call(func_name, args) => {
+            let func_type = env
+                .type_for_tvar(func_name.clone())
+                .ok_or(TypeError::TVarNotFound(func_name))?;
+
+            apply_type(env.substitute_fixpoint(func_type), args, env)
+        }
+        other => todo!("{:?}", other),
     }
 }
 
@@ -271,6 +281,11 @@ fn check_expr(expr: AST, typ: Type, env: OrdEnv) -> Result<OrdEnv, TypeError> {
             elems.iter().fold(Ok(env), |res, elem| {
                 check_expr(elem.to_owned(), Type::Monotype(*typ.clone()), res?)
             })
+        }
+        (AST::Ite(guard, branch1, branch2), typ) => {
+            let env_guard = check_expr(*guard, Type::Monotype(Monotype::Bool), env)?;
+            let env_branch1 = check_expr(*branch1, typ.clone(), env_guard)?;
+            check_expr(*branch2, typ, env_branch1)
         }
         // Comparable to what we do for lambdas?
         // (AST::Let(var, assigned_expr, body_expr), _) => todo!(),
@@ -438,9 +453,22 @@ fn check_top(exprs: Vec<AST>, env: OrdEnv) -> Result<OrdEnv, TypeError> {
                 _ => todo!(),
             }
         }
+        [expr] => infer_expr(expr.to_owned(), env.clone()).map(
+            |InferOut {
+                 typ: expr_type,
+                 env: expr_env,
+             }| {
+                dbg!(expr_env.substitute_fixpoint(expr_type));
+                expr_env
+            },
+        ),
         [] => todo!(),
         _ => todo!(),
     }
+}
+
+pub fn check(Toplevel(exprs): Toplevel) -> Result<OrdEnv, TypeError> {
+    check_top(exprs, OrdEnv::new())
 }
 
 // todo: implement let binding by thinking about how a lambda would handle it!
@@ -451,6 +479,7 @@ fn check_top(exprs: Vec<AST>, env: OrdEnv) -> Result<OrdEnv, TypeError> {
 #[cfg(test)]
 mod test {
     use super::*;
+    use crate::expand::expand;
     use crate::parse::tokenize;
 
     #[test]
@@ -725,6 +754,110 @@ mod test {
             Err(TypeError::SubtypeMismatch(
                 Expected(Type::Monotype(Monotype::Symbol)),
                 Given(Type::Monotype(Monotype::I64))
+            ))
+        )
+    }
+
+    #[test]
+    fn func_check_mono() {
+        let ast_func = expand(
+            tokenize(
+                r#"
+            ((declare map (-> ((-> (I64) String) (List I64)) (List String)))
+             (fn map (f input-list)
+              (if (empty? input-list)
+               (list)
+               (cons (f (car input-list)) (map f (cdr input-list)))))
+             (map (lambda (elem) "hey") (list 1 4 7 8)))
+            "#,
+            )
+            .unwrap()
+            .parse_toplevel(),
+        )
+        .unwrap();
+
+        let res = check_top(ast_func.0, OrdEnv::new());
+
+        assert!(matches!(res, Ok(_)))
+    }
+
+    #[test]
+    fn func_check_poly_1() {
+        let ast_func = expand(
+            tokenize(
+                r#"
+                ((declare map (forall a (forall b (-> ((-> (a) b) (List a)) (List b)))))
+                 (fn map (f input-list)
+                  (if (empty? input-list)
+                   (list)
+                   (cons (f (car input-list)) (map f (cdr input-list)))))
+                 (map (lambda (elem) "hey") (list 1 4 7 8)))
+                "#,
+            )
+            .unwrap()
+            .parse_toplevel(),
+        )
+        .unwrap();
+
+        let res = check_top(ast_func.0, OrdEnv::new());
+
+        assert!(matches!(res, Ok(_)))
+    }
+
+    #[test]
+    fn func_check_poly_1_err_1() {
+        let ast_func = expand(
+            tokenize(
+                r#"
+                ((declare map (forall a (forall b (-> ((-> (a) b) (List a)) (List b)))))
+                 (fn map (f input-list)
+                  (if (empty? input-list)
+                   (list)
+                   (cons (car input-list) (map f (cdr input-list)))))
+                 (map (lambda (elem) "hey") (list 1 4 7 8)))
+                "#,
+            )
+            .unwrap()
+            .parse_toplevel(),
+        )
+        .unwrap();
+
+        let err = check_top(ast_func.0, OrdEnv::new());
+
+        assert_eq!(
+            err,
+            Err(TypeError::SubtypeMismatch(
+                Expected(Type::Monotype(Monotype::UVar(UVar("b".to_string())))),
+                Given(Type::Monotype(Monotype::UVar(UVar("a".to_string()))))
+            ))
+        )
+    }
+
+    #[test]
+    fn func_check_poly_1_err_2() {
+        let ast_func = expand(
+            tokenize(
+                r#"
+                ((declare map (forall a (forall b (-> ((-> (a) b) (List a)) (List a)))))
+                 (fn map (f input-list)
+                  (if (empty? input-list)
+                   (list)
+                   (cons (f (car input-list)) (map f (cdr input-list)))))
+                 (map (lambda (elem) "hey") (list 1 4 7 8)))
+                "#,
+            )
+            .unwrap()
+            .parse_toplevel(),
+        )
+        .unwrap();
+
+        let err = check_top(ast_func.0, OrdEnv::new());
+
+        assert_eq!(
+            err,
+            Err(TypeError::SubtypeMismatch(
+                Expected(Type::Monotype(Monotype::UVar(UVar("a".to_string())))),
+                Given(Type::Monotype(Monotype::UVar(UVar("b".to_string()))))
             ))
         )
     }

@@ -1,8 +1,8 @@
 #![allow(dead_code)]
 
+pub mod poly;
 mod instantiate;
 mod ordered_env;
-mod poly;
 mod subtyping;
 mod well_formed;
 

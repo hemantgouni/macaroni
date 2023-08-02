@@ -7,7 +7,9 @@ use crate::utils::UniqueString;
 
 pub fn subtype(left: Type, right: Type, env: OrdEnv) -> Result<OrdEnv, TypeError> {
     println!("Subtype\n========\n{:#?}\n<:\n{:#?}\nenv: {:#?}\n", left, right, env);
-    match (left, right) {
+    match (left.clone(), right.clone()) {
+        (Type::Monotype(Monotype::List(monotype)), _) => subtype(Type::Monotype(*monotype), right, env),
+        (_, Type::Monotype(Monotype::List(monotype))) => subtype(left, Type::Monotype(*monotype), env),
         // <: Var
         (Type::Monotype(Monotype::UVar(uvar1)), Type::Monotype(Monotype::UVar(uvar2)))
             if uvar1 == uvar2 =>
