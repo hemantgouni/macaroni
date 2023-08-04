@@ -329,7 +329,8 @@ mod test {
                  (* base (exp base (- exp 1)))))
              (declare-macrotype staged-exp (I64 I64))
              (macro staged-exp (base expr)
-               (exp base expr)))
+               (exp base expr))
+             (staged-exp (+ 1 1) 7))
             ",
         )
         .unwrap()

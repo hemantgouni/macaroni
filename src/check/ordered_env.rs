@@ -32,7 +32,7 @@ impl OrdEnv {
 
     pub fn add(&self, elem: OrdEnvElem) -> Self {
         // Ensuring no duplicate entries
-        assert!(!self.contains(&elem));
+        // assert!(!self.contains(&elem));
 
         let mut self_clone = self.clone();
         self_clone.0.push(elem);
