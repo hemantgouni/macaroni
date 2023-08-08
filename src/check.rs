@@ -1,8 +1,8 @@
 #![allow(dead_code)]
 
-pub mod poly;
 mod instantiate;
 mod ordered_env;
+pub mod poly;
 mod subtyping;
 mod well_formed;
 
@@ -142,6 +142,7 @@ pub enum Monotype {
     Bool,
     String,
     Symbol,
+    Lit(Box<Monotype>),
     List(Box<Monotype>),
     Func(Vec<Monotype>, Box<Monotype>),
 }
@@ -196,6 +197,7 @@ impl Monotype {
                 .flat_map(|arg_monotype| arg_monotype.free_evars().to_owned())
                 .collect::<Vec<EVar>>()
                 .append_immutable(&res_monotype.free_evars()),
+            Monotype::Lit(monotype) => monotype.free_evars(),
             Monotype::Bottom
             | Monotype::UVar(..)
             | Monotype::I64

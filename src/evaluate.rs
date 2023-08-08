@@ -6,6 +6,7 @@ pub fn evaluate(Toplevel(forms): Toplevel) -> Result<Lit, String> {
 
 pub fn evaluate_top(forms: Vec<AST>, mut environment: Env<AST>) -> Result<Lit, String> {
     match forms.as_slice() {
+        [AST::MacroTypeDec(..) | AST::TypeDec(..), rest @ ..] => evaluate_top(rest.to_vec(), environment),
         [func @ AST::Func(ident, _, _), rest @ ..] => evaluate_top(
             rest.to_vec(),
             environment.insert(ident.clone(), func.clone()),

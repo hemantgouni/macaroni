@@ -20,6 +20,9 @@ fn parse_monotype(elem: &Elem<String>) -> Monotype {
             [Elem::Symbol(str), typ] if str == "List" => {
                 Monotype::List(Box::new(parse_monotype(typ)))
             }
+            [Elem::Symbol(str), typ] if str == "Lit" => {
+                Monotype::Lit(Box::new(parse_monotype(typ)))
+            }
             // TODO: add tests for function type parsing
             other => panic!("Invalid type: {:?}", other),
         },

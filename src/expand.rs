@@ -1,97 +1,145 @@
-use crate::data::{Env, Ident, Lit, Toplevel, AST};
+use crate::data::{Env, Ident, Lit, MacroType, Toplevel, AST};
 use crate::evaluate::evaluate_expr;
 use crate::utils::VecUtils;
 
 use crate::check::Type;
 
-fn expand_expr(expr: AST, environment: Env<AST>) -> Result<AST, String> {
+fn expand_expr(
+    expr: AST,
+    environment: Env<AST>,
+    mac_typ_env: Env<MacroType>,
+) -> Result<AST, String> {
     match expr {
-        AST::Type(typ, expr) => Ok(AST::Type(typ, Box::new(expand_expr(*expr, environment)?))),
+        AST::Type(typ, expr) => Ok(AST::Type(
+            typ,
+            Box::new(expand_expr(*expr, environment, mac_typ_env)?),
+        )),
         AST::Lambda(args, body) => {
             // TODO: it feels kinda bad to trigger rewrites "at a distance" like this.. is there a
             // better way?
             Ok(AST::Lambda(
                 args,
-                Box::new(expand_expr(*body, environment)?),
+                Box::new(expand_expr(*body, environment, mac_typ_env)?),
             ))
         }
         AST::App(lambda, args) => Ok::<AST, String>(AST::App(
-            Box::new(expand_expr(*lambda, environment)?),
+            Box::new(expand_expr(*lambda, environment, mac_typ_env)?),
             args.iter()
                 .fold(Ok(Vec::new()), |res: Result<Vec<AST>, String>, arg| {
                     res.map(|exp_arg| exp_arg.append_immutable(&vec![arg.clone()]))
                 })?,
         )),
-        AST::MacroCall(ident, actual_args) => match environment.lookup(&ident) {
-            Ok(AST::Macro(_, formal_args, body)) => {
-                let binding_list: Vec<(Ident, Lit)> = formal_args
-                    .iter()
-                    .map(|ident| ident.to_owned())
-                    .zip(actual_args)
-                    .collect();
-
-                let environment: Result<Env<AST>, String> =
-                    binding_list
+        AST::MacroCall(ident, actual_args) => {
+            match (environment.lookup(&ident), mac_typ_env.lookup(&ident)) {
+                (
+                    Ok(AST::Macro(_, formal_args, body)),
+                    Ok(MacroType {
+                        arg_types: formal_arg_types,
+                        err_msg: error_msg,
+                    }),
+                ) => {
+                    // ignoring creating a binding env for now
+                    let res: Result<Vec<Lit>, ()> = actual_args
                         .iter()
-                        .fold(Ok(environment), |env, (ident, lit)| {
-                            // We shouldn't expand the lit binding here, since the macro must
-                            // receive it as syntax, unmodified
-                            Ok(env?.insert(ident.to_owned(), AST::Lit(lit.to_owned())))
-                        });
+                        .zip(formal_arg_types.iter())
+                        .fold(Ok(Vec::new()), |args_or_err, (arg, expected_type)| {
+                            // 1. parse arg back into an AST node
+                            // 2. if expected_type is a Lit, peel off the Lit first
+                            //    a. invoke check_expr on it to make sure it's of the expected type
+                            // 3. if expected_type is a Lit, parse arg from a symbol into the desired type
+                            // 4. bind all formal arguments to the transformed actual args
+                            // 5. expand the macro as usual
 
-                // Evaluate the BODY of the macro we called first, to get back a literal form! Then
-                // parse the literal form into an AST and expand it.
-                //
-                // So if we have two nested macro calls, we'll first evaluate the outer one, then
-                // parse the returned lits
-                //
-                // And then call expand on any resulting macro calls?
-                //
-                // (Specifically, we need the call to expand here if there are ANY calls to
-                // non-built-in functions inside the body of some macro, since it'll be expanded to
-                // a MacroCall, which needs to be turned into a Call here-- so it matters even if
-                // there isn't another macro to be expanded in the body!)
-                //
-                // TODO: remove the enclosing expand and make sure this fails in the way we expect
-                // it to
-                expand_expr(
-                    evaluate_expr(*body, environment.clone()?).map(|lit| lit.to_elem().parse())?,
-                    environment?,
-                )
+                            todo!()
+                    });
+
+                    todo!()
+                }
+                (Ok(AST::Macro(_, formal_args, body)), _) => {
+                    let binding_list: Vec<(Ident, Lit)> = formal_args
+                        .iter()
+                        .map(|ident| ident.to_owned())
+                        .zip(actual_args)
+                        .collect();
+
+                    let environment: Result<Env<AST>, String> =
+                        binding_list
+                            .iter()
+                            .fold(Ok(environment), |env, (ident, lit)| {
+                                // We shouldn't expand the lit binding here, since the macro must
+                                // receive it as syntax, unmodified
+                                Ok(env?.insert(ident.to_owned(), AST::Lit(lit.to_owned())))
+                            });
+
+                    // Evaluate the BODY of the macro we called first, to get back a literal form! Then
+                    // parse the literal form into an AST and expand it.
+                    //
+                    // So if we have two nested macro calls, we'll first evaluate the outer one, then
+                    // parse the returned lits
+                    //
+                    // And then call expand on any resulting macro calls?
+                    //
+                    // (Specifically, we need the call to expand here if there are ANY calls to
+                    // non-built-in functions inside the body of some macro, since it'll be expanded to
+                    // a MacroCall, which needs to be turned into a Call here-- so it matters even if
+                    // there isn't another macro to be expanded in the body!)
+                    //
+                    // TODO: remove the enclosing expand and make sure this fails in the way we expect
+                    // it to
+                    expand_expr(
+                        evaluate_expr(*body, environment.clone()?)
+                            .map(|lit| lit.to_elem().parse())?,
+                        environment?,
+                        mac_typ_env,
+                    )
+                }
+                _ => Ok(AST::Call(
+                    ident,
+                    actual_args.iter().fold(
+                        Ok(vec![]),
+                        |arg_vec: Result<Vec<AST>, String>, expr: &Lit| {
+                            Ok(
+                                // TODO: order matters here; see if we made this mistake anywhere else!!
+                                arg_vec?.append_immutable(&vec![expand_expr(
+                                    expr.clone().to_elem().parse(),
+                                    environment.clone(),
+                                    mac_typ_env.clone(),
+                                )?]),
+                            )
+                        },
+                    )?,
+                )),
             }
-            _ => Ok(AST::Call(
-                ident,
-                actual_args.iter().fold(
-                    Ok(vec![]),
-                    |arg_vec: Result<Vec<AST>, String>, expr: &Lit| {
-                        Ok(
-                            // TODO: order matters here; see if we made this mistake anywhere else!!
-                            arg_vec?.append_immutable(&vec![expand_expr(
-                                expr.clone().to_elem().parse(),
-                                environment.clone(),
-                            )?]),
-                        )
-                    },
-                )?,
-            )),
-        },
+        }
         // TODO: Figure out why we need this!
         AST::Call(ident, actual_args) => Ok(AST::Call(
             ident,
             actual_args.iter().fold(
                 Ok(Vec::new()),
                 |args: Result<Vec<AST>, String>, arg: &AST| {
-                    Ok(args?
-                        .append_immutable(&vec![expand_expr(arg.to_owned(), environment.clone())?]))
+                    Ok(args?.append_immutable(&vec![expand_expr(
+                        arg.to_owned(),
+                        environment.clone(),
+                        mac_typ_env.clone(),
+                    )?]))
                 },
             )?,
         )),
-        AST::Eval(expr) => Ok(AST::Eval(Box::new(expand_expr(*expr, environment)?))),
-        AST::ParseInt(expr) => Ok(AST::ParseInt(Box::new(expand_expr(*expr, environment)?))),
+        AST::Eval(expr) => Ok(AST::Eval(Box::new(expand_expr(
+            *expr,
+            environment,
+            mac_typ_env,
+        )?))),
+        AST::ParseInt(expr) => Ok(AST::ParseInt(Box::new(expand_expr(
+            *expr,
+            environment,
+            mac_typ_env,
+        )?))),
         AST::List(exprs) => Ok(AST::List({
             let exprs: Result<Vec<AST>, String> =
                 exprs.iter().fold(Ok(Vec::new()), |exprs, expr| {
-                    let var: AST = expand_expr(expr.to_owned(), environment.to_owned())?;
+                    let var: AST =
+                        expand_expr(expr.to_owned(), environment.to_owned(), mac_typ_env.clone())?;
                     let mut exprs = exprs?;
                     exprs.push(var);
                     Ok(exprs)
@@ -99,35 +147,71 @@ fn expand_expr(expr: AST, environment: Env<AST>) -> Result<AST, String> {
             exprs?
         })),
         AST::Add(expr1, expr2) => Ok(AST::Add(
-            Box::new(expand_expr(*expr1, environment.clone())?),
-            Box::new(expand_expr(*expr2, environment)?),
+            Box::new(expand_expr(
+                *expr1,
+                environment.clone(),
+                mac_typ_env.clone(),
+            )?),
+            Box::new(expand_expr(*expr2, environment, mac_typ_env.clone())?),
         )),
         AST::Sub(expr1, expr2) => Ok(AST::Sub(
-            Box::new(expand_expr(*expr1, environment.clone())?),
-            Box::new(expand_expr(*expr2, environment)?),
+            Box::new(expand_expr(
+                *expr1,
+                environment.clone(),
+                mac_typ_env.clone(),
+            )?),
+            Box::new(expand_expr(*expr2, environment, mac_typ_env.clone())?),
         )),
         AST::Mult(expr1, expr2) => Ok(AST::Mult(
-            Box::new(expand_expr(*expr1, environment.clone())?),
-            Box::new(expand_expr(*expr2, environment)?),
+            Box::new(expand_expr(
+                *expr1,
+                environment.clone(),
+                mac_typ_env.clone(),
+            )?),
+            Box::new(expand_expr(*expr2, environment, mac_typ_env.clone())?),
         )),
         AST::Div(expr1, expr2) => Ok(AST::Div(
-            Box::new(expand_expr(*expr1, environment.clone())?),
-            Box::new(expand_expr(*expr2, environment)?),
+            Box::new(expand_expr(
+                *expr1,
+                environment.clone(),
+                mac_typ_env.clone(),
+            )?),
+            Box::new(expand_expr(*expr2, environment, mac_typ_env.clone())?),
         )),
         AST::Mod(expr1, expr2) => Ok(AST::Mod(
-            Box::new(expand_expr(*expr1, environment.clone())?),
-            Box::new(expand_expr(*expr2, environment)?),
+            Box::new(expand_expr(
+                *expr1,
+                environment.clone(),
+                mac_typ_env.clone(),
+            )?),
+            Box::new(expand_expr(*expr2, environment, mac_typ_env.clone())?),
         )),
         AST::Concat(expr1, expr2) => Ok(AST::Concat(
-            Box::new(expand_expr(*expr1, environment.clone())?),
-            Box::new(expand_expr(*expr2, environment)?),
+            Box::new(expand_expr(
+                *expr1,
+                environment.clone(),
+                mac_typ_env.clone(),
+            )?),
+            Box::new(expand_expr(*expr2, environment, mac_typ_env.clone())?),
         )),
         AST::Cons(expr1, expr2) => Ok(AST::Cons(
-            Box::new(expand_expr(*expr1, environment.clone())?),
-            Box::new(expand_expr(*expr2, environment)?),
+            Box::new(expand_expr(
+                *expr1,
+                environment.clone(),
+                mac_typ_env.clone(),
+            )?),
+            Box::new(expand_expr(*expr2, environment, mac_typ_env.clone())?),
         )),
-        AST::Car(expr) => Ok(AST::Car(Box::new(expand_expr(*expr, environment)?))),
-        AST::Cdr(expr) => Ok(AST::Cdr(Box::new(expand_expr(*expr, environment)?))),
+        AST::Car(expr) => Ok(AST::Car(Box::new(expand_expr(
+            *expr,
+            environment,
+            mac_typ_env.clone(),
+        )?))),
+        AST::Cdr(expr) => Ok(AST::Cdr(Box::new(expand_expr(
+            *expr,
+            environment,
+            mac_typ_env.clone(),
+        )?))),
         AST::Let(Ident(string), binding, expr) => {
             // let rewrite_to_ident: fn(AST) -> AST = |ast: AST| match ast {
             //     AST::Lit(Lit::Symbol(string)) => AST::Var(Ident(string)),
@@ -144,36 +228,72 @@ fn expand_expr(expr: AST, environment: Env<AST>) -> Result<AST, String> {
 
             Ok(AST::Let(
                 Ident(string),
-                Box::new(expand_expr(*binding, environment.clone())?),
-                Box::new(expand_expr(*expr, environment)?),
+                Box::new(expand_expr(
+                    *binding,
+                    environment.clone(),
+                    mac_typ_env.clone(),
+                )?),
+                Box::new(expand_expr(*expr, environment, mac_typ_env.clone())?),
             ))
         }
         AST::Ite(guard, expr1, expr2) => Ok(AST::Ite(
-            Box::new(expand_expr(*guard, environment.clone())?),
-            Box::new(expand_expr(*expr1, environment.clone())?),
-            Box::new(expand_expr(*expr2, environment)?),
+            Box::new(expand_expr(
+                *guard,
+                environment.clone(),
+                mac_typ_env.clone(),
+            )?),
+            Box::new(expand_expr(
+                *expr1,
+                environment.clone(),
+                mac_typ_env.clone(),
+            )?),
+            Box::new(expand_expr(*expr2, environment, mac_typ_env.clone())?),
         )),
         AST::Lt(expr1, expr2) => Ok(AST::Lt(
-            Box::new(expand_expr(*expr1, environment.clone())?),
-            Box::new(expand_expr(*expr2, environment)?),
+            Box::new(expand_expr(
+                *expr1,
+                environment.clone(),
+                mac_typ_env.clone(),
+            )?),
+            Box::new(expand_expr(*expr2, environment, mac_typ_env.clone())?),
         )),
         AST::Gt(expr1, expr2) => Ok(AST::Gt(
-            Box::new(expand_expr(*expr1, environment.clone())?),
-            Box::new(expand_expr(*expr2, environment)?),
+            Box::new(expand_expr(
+                *expr1,
+                environment.clone(),
+                mac_typ_env.clone(),
+            )?),
+            Box::new(expand_expr(*expr2, environment, mac_typ_env.clone())?),
         )),
         AST::Eq(expr1, expr2) => Ok(AST::Eq(
-            Box::new(expand_expr(*expr1, environment.clone())?),
-            Box::new(expand_expr(*expr2, environment)?),
+            Box::new(expand_expr(
+                *expr1,
+                environment.clone(),
+                mac_typ_env.clone(),
+            )?),
+            Box::new(expand_expr(*expr2, environment, mac_typ_env.clone())?),
         )),
         AST::Or(expr1, expr2) => Ok(AST::Or(
-            Box::new(expand_expr(*expr1, environment.clone())?),
-            Box::new(expand_expr(*expr2, environment)?),
+            Box::new(expand_expr(
+                *expr1,
+                environment.clone(),
+                mac_typ_env.clone(),
+            )?),
+            Box::new(expand_expr(*expr2, environment, mac_typ_env.clone())?),
         )),
         AST::And(expr1, expr2) => Ok(AST::And(
-            Box::new(expand_expr(*expr1, environment.clone())?),
-            Box::new(expand_expr(*expr2, environment)?),
+            Box::new(expand_expr(
+                *expr1,
+                environment.clone(),
+                mac_typ_env.clone(),
+            )?),
+            Box::new(expand_expr(*expr2, environment, mac_typ_env.clone())?),
         )),
-        AST::Emptyp(expr) => Ok(AST::Emptyp(Box::new(expand_expr(*expr, environment)?))),
+        AST::Emptyp(expr) => Ok(AST::Emptyp(Box::new(expand_expr(
+            *expr,
+            environment,
+            mac_typ_env.clone(),
+        )?))),
         AST::Lit(lit) => Ok(AST::Lit(lit)),
         AST::Var(Ident(str)) => Ok({
             let rewrite_to_ident: fn(AST) -> AST = |ast: AST| match ast {
@@ -190,8 +310,23 @@ fn expand_expr(expr: AST, environment: Env<AST>) -> Result<AST, String> {
     }
 }
 
-fn expand_top(forms: Vec<AST>, mut out_env: Env<AST>) -> Result<Vec<AST>, String> {
+fn expand_top(
+    forms: Vec<AST>,
+    mut out_env: Env<AST>,
+    mut mac_typ_env: Env<MacroType>,
+) -> Result<Vec<AST>, String> {
     match forms.as_slice() {
+        [AST::MacroTypeDec(mac_name, arg_types, err_msg), rest @ ..] => expand_top(
+            rest.to_vec(),
+            out_env,
+            mac_typ_env.insert(
+                mac_name.to_owned(),
+                MacroType {
+                    arg_types: arg_types.to_owned(),
+                    err_msg: err_msg.to_owned(),
+                },
+            ),
+        ),
         [AST::Func(ident, args, body), rest @ ..] => {
             // let rewrite_to_ident: fn(AST) -> AST = |ast: AST| match ast {
             //     AST::Lit(Lit::Symbol(string)) => AST::Var(Ident(string)),
@@ -228,6 +363,7 @@ fn expand_top(forms: Vec<AST>, mut out_env: Env<AST>) -> Result<Vec<AST>, String
                             ident.to_owned(),
                             AST::Func(ident.to_owned(), args.to_owned(), body.to_owned()),
                         ),
+                        mac_typ_env.clone(),
                     )?
                     .rewrite(),
                 ),
@@ -236,6 +372,7 @@ fn expand_top(forms: Vec<AST>, mut out_env: Env<AST>) -> Result<Vec<AST>, String
             Ok(vec![expanded_func.to_owned()].append_immutable(&expand_top(
                 rest.to_vec(),
                 out_env.insert(ident.to_owned(), expanded_func),
+                mac_typ_env,
             )?))
         }
         [AST::Macro(ident, args, body), rest @ ..] => {
@@ -267,18 +404,22 @@ fn expand_top(forms: Vec<AST>, mut out_env: Env<AST>) -> Result<Vec<AST>, String
             let expanded_func: AST = AST::Macro(
                 ident.to_owned(),
                 args.to_owned(),
-                Box::new(expand_expr(*body.to_owned(), out_env.clone())?.rewrite()),
+                Box::new(
+                    expand_expr(*body.to_owned(), out_env.clone(), mac_typ_env.clone())?.rewrite(),
+                ),
             );
 
             Ok(vec![expanded_func.to_owned()].append_immutable(&expand_top(
                 rest.to_vec(),
                 out_env.insert(ident.to_owned(), expanded_func),
+                mac_typ_env,
             )?))
         }
-        [type_dec @ AST::TypeDec(..), rest @ ..] => {
-            Ok(vec![type_dec.to_owned()].append_immutable(&expand_top(rest.to_vec(), out_env)?))
-        }
-        [expr, ..] => Ok(vec![expand_expr(expr.to_owned(), out_env)?.rewrite()]),
+        [type_dec @ AST::TypeDec(..), rest @ ..] => Ok(vec![type_dec.to_owned()]
+            .append_immutable(&expand_top(rest.to_vec(), out_env, mac_typ_env)?)),
+        [expr, ..] => Ok(vec![
+            expand_expr(expr.to_owned(), out_env, mac_typ_env)?.rewrite()
+        ]),
         [] => Err(
             "expand_top either didn't find any top-level forms or a runnable expr. This is a bug!"
                 .to_string(),
@@ -287,7 +428,7 @@ fn expand_top(forms: Vec<AST>, mut out_env: Env<AST>) -> Result<Vec<AST>, String
 }
 
 pub fn expand(Toplevel(forms): Toplevel) -> Result<Toplevel, String> {
-    Ok(Toplevel(expand_top(forms, Env::new())?))
+    Ok(Toplevel(expand_top(forms, Env::new(), Env::new())?))
 }
 
 #[cfg(test)]
@@ -320,25 +461,27 @@ mod test {
     //       macrotype
     // 3. Otherwise:
     //    a. Proceed with macro expansion as usual
-    // #[test]
+    #[test]
     fn macrotype_expand() {
         let program: Toplevel = tokenize(
-            "
-            ((declare exp (-> (Quoted (Lit I64)) Quoted))
-             (fn exp (base exp)
+            r#"
+            ((declare staged-exp-helper (-> (I64 I64) I64))
+             (fn staged-exp-helper (base exp)
                (if (== exp 0)
                  1
-                 (list (quote *) base (exp base (- exp 1)))))
-             (declare-macrotype staged-exp (I64 (Lit I64)))
-             (macro staged-exp (base expr)
-               (exp base expr))
+                 (list (quote *) base (staged-exp-helper base (- exp 1)))))
+             (declare-macrotype staged-exp (I64 (Lit I64)) "Integer expected, got ???")
+             (macro staged-exp (base exp)
+               (staged-exp-helper base exp))
              (staged-exp (+ 1 1) 7))
-            ",
+            "#,
         )
         .unwrap()
         .parse_toplevel();
 
-        // let result: Lit = evaluate(expand(program).unwrap()).unwrap();
+        let result: Lit = evaluate(expand(program).unwrap()).unwrap();
+
+        panic!("{:?}", result)
     }
 
     #[test]

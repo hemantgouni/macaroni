@@ -1,5 +1,5 @@
 use crate::check::{EVar, Monotype, Type, UVar};
-use crate::data::{MacroErrorMsg, Ident};
+use crate::data::{Ident, MacroErrorMsg};
 use crate::utils::UniqueString;
 
 #[derive(Debug, PartialEq, Eq, Clone)]
@@ -106,6 +106,7 @@ impl OrdEnv {
             | Monotype::Symbol
             | Monotype::Bool
             | Monotype::Bottom => typ,
+            Monotype::Lit(typ) => Monotype::Lit(Box::new(self.substitute_mono(*typ))),
             Monotype::EVar(ref evar) => match self.sol_for_evar(evar.clone()) {
                 Some(OrdEnvElem::ESol(_, monotype)) => monotype,
                 _ => typ,

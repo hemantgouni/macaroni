@@ -40,6 +40,7 @@ pub fn well_formed(typ: Type, env: OrdEnv) -> Result<(), TypeError> {
                 })
             }
             Monotype::List(typ) => well_formed(Type::Monotype(*typ), env),
+            Monotype::Lit(typ) => well_formed(Type::Monotype(*typ), env),
             Monotype::Bottom
             | Monotype::I64
             | Monotype::Bool

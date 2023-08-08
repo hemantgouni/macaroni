@@ -61,6 +61,12 @@ impl Lit {
 pub struct MacroErrorMsg(pub String);
 
 #[derive(Debug, Eq, PartialEq, Clone)]
+pub struct MacroType {
+    pub arg_types: Vec<Type>,
+    pub err_msg: MacroErrorMsg,
+}
+
+#[derive(Debug, Eq, PartialEq, Clone)]
 pub enum AST {
     Type(Type, Box<AST>),
     TypeDec(Ident, Type),
