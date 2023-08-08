@@ -23,7 +23,7 @@ pub fn evaluate_top(forms: Vec<AST>, mut environment: Env<AST>) -> Result<Lit, S
 }
 
 pub fn evaluate_expr(program: AST, mut environment: Env<AST>) -> Result<Lit, String> {
-    match program.clone() {
+    match dbg!(program.clone()) {
         AST::Type(_, expr) => evaluate_expr(*expr, environment.to_owned()),
         AST::Call(ident, actual_args) => match environment.lookup(&ident) {
             Ok(AST::Func(_, formal_args, body)) => {
@@ -204,6 +204,13 @@ pub fn evaluate_expr(program: AST, mut environment: Env<AST>) -> Result<Lit, Str
             let prog = evaluate_expr(*expr, environment.to_owned())?;
             evaluate_expr(prog.to_elem().parse(), environment.to_owned())
         }
+        AST::ParseInt(expr) => match evaluate_expr(*expr, environment.to_owned())? {
+            Lit::Symbol(str) => {
+                let parsed_str = str.parse::<i64>().map_err(|err| err.to_string())?;
+                Ok(Lit::I64(parsed_str))
+            }
+            other => Err(format!("Unable to parse {:?} as integer", other)),
+        },
         AST::Rewrite(expr, _) => evaluate_expr(*expr, environment),
         _ => Err(format!("Unable to evaluate the tree {:?}", program)),
     }

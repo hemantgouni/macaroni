@@ -64,7 +64,7 @@ pub struct MacroErrorMsg(pub String);
 pub enum AST {
     Type(Type, Box<AST>),
     TypeDec(Ident, Type),
-    MacroTypeDec(Ident, Type, MacroErrorMsg),
+    MacroTypeDec(Ident, Vec<Type>, MacroErrorMsg),
     Lambda(Vec<Ident>, Box<AST>),
     App(Box<AST>, Vec<AST>),
     Func(Ident, Vec<Ident>, Box<AST>),
@@ -74,6 +74,7 @@ pub enum AST {
     Lit(Lit),
     Var(Ident),
     Eval(Box<AST>),
+    ParseInt(Box<AST>),
     List(Vec<AST>),
     Cons(Box<AST>, Box<AST>),
     Car(Box<AST>),
@@ -120,6 +121,7 @@ impl AST {
             AST::Lit(lit) => AST::Lit(lit),
             AST::Var(ident) => AST::Var(ident),
             AST::Eval(expr) => AST::Eval(Box::new(Self::rewrite(*expr))),
+            AST::ParseInt(expr) => AST::ParseInt(Box::new(Self::rewrite(*expr))),
             AST::List(exprs) => AST::List(
                 exprs
                     .iter()

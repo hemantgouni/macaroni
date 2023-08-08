@@ -119,6 +119,9 @@ impl Elem<String> {
                 [Elem::Symbol(str), body] if str == "eval" => {
                     AST::Eval(Box::new(body.clone().parse()))
                 }
+                [Elem::Symbol(str), body] if str == "parse-int" => {
+                    AST::ParseInt(Box::new(body.clone().parse()))
+                }
                 [Elem::Symbol(str), Elem::Symbol(ident), expr1, expr2] if str == "let" => AST::Let(
                     (*ident).as_str().into(),
                     Box::new(expr1.clone().parse()),
@@ -186,12 +189,12 @@ impl Elem<String> {
                             [Elem::Symbol(str), Elem::Symbol(ident), typ] if str == "declare" => {
                                 AST::TypeDec((*ident).as_str().into(), parse_type(typ))
                             }
-                            [Elem::Symbol(str), Elem::Symbol(ident), typ, Elem::String(err)]
+                            [Elem::Symbol(str), Elem::Symbol(ident), Elem::List(arg_types), Elem::String(err)]
                                 if str == "declare-macrotype" =>
                             {
                                 AST::MacroTypeDec(
                                     (*ident).as_str().into(),
-                                    parse_type(typ),
+                                    arg_types.iter().map(|arg| parse_type(arg)).collect(),
                                     MacroErrorMsg(err.to_string()),
                                 )
                             }

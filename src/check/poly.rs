@@ -423,6 +423,14 @@ fn peel_foralls(foralls: Type, env: OrdEnv) -> (Vec<Type>, Type, OrdEnv) {
 
 fn check_top(exprs: Vec<AST>, env: OrdEnv) -> Result<OrdEnv, TypeError> {
     match exprs.as_slice() {
+        [AST::MacroTypeDec(mac, macro_arg_type, err_msg), rest @ ..] => check_top(
+            rest.to_vec(),
+            env.add(OrdEnvElem::MacroTVar(
+                mac.to_owned(),
+                macro_arg_type.to_owned(),
+                err_msg.to_owned(),
+            )),
+        ),
         [AST::TypeDec(func, func_type), rest @ ..] => check_top(
             rest.to_vec(),
             env.add(OrdEnvElem::TVar(func.to_owned(), func_type.to_owned())),

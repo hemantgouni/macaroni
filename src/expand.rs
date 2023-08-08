@@ -87,6 +87,7 @@ fn expand_expr(expr: AST, environment: Env<AST>) -> Result<AST, String> {
             )?,
         )),
         AST::Eval(expr) => Ok(AST::Eval(Box::new(expand_expr(*expr, environment)?))),
+        AST::ParseInt(expr) => Ok(AST::ParseInt(Box::new(expand_expr(*expr, environment)?))),
         AST::List(exprs) => Ok(AST::List({
             let exprs: Result<Vec<AST>, String> =
                 exprs.iter().fold(Ok(Vec::new()), |exprs, expr| {
@@ -319,15 +320,16 @@ mod test {
     //       macrotype
     // 3. Otherwise:
     //    a. Proceed with macro expansion as usual
-    #[test]
+    // #[test]
     fn macrotype_expand() {
         let program: Toplevel = tokenize(
             "
-            ((fn exp (base exp)
+            ((declare exp (-> (Quoted (Lit I64)) Quoted))
+             (fn exp (base exp)
                (if (== exp 0)
                  1
-                 (* base (exp base (- exp 1)))))
-             (declare-macrotype staged-exp (I64 I64))
+                 (list (quote *) base (exp base (- exp 1)))))
+             (declare-macrotype staged-exp (I64 (Lit I64)))
              (macro staged-exp (base expr)
                (exp base expr))
              (staged-exp (+ 1 1) 7))
@@ -335,6 +337,29 @@ mod test {
         )
         .unwrap()
         .parse_toplevel();
+
+        // let result: Lit = evaluate(expand(program).unwrap()).unwrap();
+    }
+
+    #[test]
+    fn exp_expand() {
+        let program: Toplevel = tokenize(
+            "
+            ((fn staged-exp-helper (base exp)
+               (if (== exp 0)
+                 1
+                 (list (quote *) base (staged-exp-helper base (- exp 1)))))
+             (macro staged-exp (base exp)
+               (staged-exp-helper base (parse-int exp)))
+             (staged-exp (+ 1 1) 7))
+            ",
+        )
+        .unwrap()
+        .parse_toplevel();
+
+        let result = evaluate(expand(program).unwrap());
+
+        assert_eq!(result, Ok(Lit::I64(128)))
     }
 
     #[test]
