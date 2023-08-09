@@ -1,8 +1,9 @@
+use crate::check::ordered_env::OrdEnv;
+use crate::check::{Monotype, Type};
+
 use crate::data::{Env, Ident, Lit, MacroType, Toplevel, AST};
 use crate::evaluate::evaluate_expr;
 use crate::utils::VecUtils;
-
-use crate::check::Type;
 
 fn expand_expr(
     expr: AST,
@@ -39,7 +40,7 @@ fn expand_expr(
                     }),
                 ) => {
                     // ignoring creating a binding env for now
-                    let res: Result<Vec<Lit>, ()> = actual_args
+                    let res: Result<Vec<AST>, String> = actual_args
                         .iter()
                         .zip(formal_arg_types.iter())
                         .fold(Ok(Vec::new()), |args_or_err, (arg, expected_type)| {
@@ -50,10 +51,44 @@ fn expand_expr(
                             // 4. bind all formal arguments to the transformed actual args
                             // 5. expand the macro as usual
 
-                            todo!()
-                    });
+                            let parsed_arg = arg.to_elem().parse();
 
-                    todo!()
+                            let (unwrapped_arg_type, transformed_arg) = match expected_type {
+                                Monotype::Lit(monotype) => match parsed_arg {
+                                    AST::Lit(..) => Ok((*monotype.to_owned(), parsed_arg.clone())),
+                                    _ => Err(format!("Couldn't resolve arg {:?} into lit", arg)),
+                                },
+                                _ => Ok((expected_type.to_owned(), AST::Lit(arg.to_owned()))),
+                            }
+                            .to_owned()?;
+
+                            crate::check::poly::check_expr(
+                                parsed_arg,
+                                Type::Monotype(unwrapped_arg_type),
+                                OrdEnv::new(),
+                            )
+                            .map_err(|_| format!("{:?}", error_msg))?;
+
+                            let args = args_or_err?;
+
+                            Ok(args.push_immutable(&transformed_arg))
+                        });
+
+                    let res = res?;
+
+                    let env_with_args = formal_args.iter().zip(res.iter()).fold(
+                        environment,
+                        |mut env, (formal_arg, actual_arg)| {
+                            env.insert(formal_arg.to_owned(), actual_arg.to_owned())
+                        },
+                    );
+
+                    expand_expr(
+                        evaluate_expr(*body, env_with_args.clone())
+                            .map(|lit| lit.to_elem().parse())?,
+                        env_with_args,
+                        mac_typ_env,
+                    )
                 }
                 (Ok(AST::Macro(_, formal_args, body)), _) => {
                     let binding_list: Vec<(Ident, Lit)> = formal_args
@@ -479,9 +514,35 @@ mod test {
         .unwrap()
         .parse_toplevel();
 
-        let result: Lit = evaluate(expand(program).unwrap()).unwrap();
+        let result = evaluate(expand(program).unwrap());
 
-        panic!("{:?}", result)
+        assert_eq!(result, Ok(Lit::I64(128)))
+    }
+
+    #[test]
+    fn macrotype_expand_err() {
+        let program: Toplevel = tokenize(
+            r#"
+            ((declare staged-exp-helper (-> (I64 I64) I64))
+             (fn staged-exp-helper (base exp)
+               (if (== exp 0)
+                 1
+                 (list (quote *) base (staged-exp-helper base (- exp 1)))))
+             (declare-macrotype staged-exp (String (Lit I64)) "Integer expected, got ???")
+             (macro staged-exp (base exp)
+               (staged-exp-helper base exp))
+             (staged-exp (+ 1 1) 7))
+            "#,
+        )
+        .unwrap()
+        .parse_toplevel();
+
+        let result = expand(program);
+
+        assert_eq!(
+            result,
+            Err(r#"MacroErrorMsg("Integer expected, got ???")"#.to_string())
+        )
     }
 
     #[test]

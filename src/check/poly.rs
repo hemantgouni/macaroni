@@ -235,11 +235,20 @@ fn infer_expr(expr: AST, env: OrdEnv) -> Result<InferOut, TypeError> {
 
             apply_type(env.substitute_fixpoint(func_type), args, env)
         }
+        AST::Add(left_num, right_num) => {
+            check_expr(*left_num, Type::Monotype(Monotype::I64), env.clone())?;
+            check_expr(*right_num, Type::Monotype(Monotype::I64), env.clone())?;
+
+            Ok(InferOut {
+                typ: Type::Monotype(Monotype::I64),
+                env,
+            })
+        }
         other => todo!("{:?}", other),
     }
 }
 
-fn check_expr(expr: AST, typ: Type, env: OrdEnv) -> Result<OrdEnv, TypeError> {
+pub fn check_expr(expr: AST, typ: Type, env: OrdEnv) -> Result<OrdEnv, TypeError> {
     println!(
         "Check\n========\nexpr: {:#?}\ntype: {:#?}\nenv: {:#?}\n",
         expr, typ, env

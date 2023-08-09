@@ -1,4 +1,4 @@
-use crate::check::Type;
+use crate::check::{Monotype, Type};
 use std::collections::HashMap;
 
 #[derive(Debug, Eq, PartialEq, Clone)]
@@ -62,7 +62,7 @@ pub struct MacroErrorMsg(pub String);
 
 #[derive(Debug, Eq, PartialEq, Clone)]
 pub struct MacroType {
-    pub arg_types: Vec<Type>,
+    pub arg_types: Vec<Monotype>,
     pub err_msg: MacroErrorMsg,
 }
 
@@ -70,7 +70,7 @@ pub struct MacroType {
 pub enum AST {
     Type(Type, Box<AST>),
     TypeDec(Ident, Type),
-    MacroTypeDec(Ident, Vec<Type>, MacroErrorMsg),
+    MacroTypeDec(Ident, Vec<Monotype>, MacroErrorMsg),
     Lambda(Vec<Ident>, Box<AST>),
     App(Box<AST>, Vec<AST>),
     Func(Ident, Vec<Ident>, Box<AST>),

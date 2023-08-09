@@ -6,7 +6,7 @@ use crate::utils::UniqueString;
 pub enum OrdEnvElem {
     UVar(UVar),
     TVar(Ident, Type),
-    MacroTVar(Ident, Vec<Type>, MacroErrorMsg),
+    MacroTVar(Ident, Vec<Monotype>, MacroErrorMsg),
     EVar(EVar),
     ESol(EVar, Monotype),
     Marker(EVar),

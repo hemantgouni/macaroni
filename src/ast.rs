@@ -197,7 +197,7 @@ impl Elem<String> {
                             {
                                 AST::MacroTypeDec(
                                     (*ident).as_str().into(),
-                                    arg_types.iter().map(|arg| parse_type(arg)).collect(),
+                                    arg_types.iter().map(|arg| parse_monotype(arg)).collect(),
                                     MacroErrorMsg(err.to_string()),
                                 )
                             }
